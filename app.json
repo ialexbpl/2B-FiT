@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Expo Empty Template",
+    "slug": "expo-empty-template",
+    "scheme": "expo-empty-template",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    
+    "userInterfaceStyle": "automatic",
+    
+    "updates": {
+      "url": "",
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "web": { "bundler": "metro", "output": "static" }
+  }
+}
