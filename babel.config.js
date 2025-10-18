@@ -22,7 +22,9 @@ module.exports = function (api) {
             '@utils': './src/utils'
           }
         }
-      ]
+      ],
+      // Reanimated plugin must be listed last
+      'react-native-reanimated/plugin'
     ]
   };
 };
