@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Expo Empty Template",
-    "slug": "expo-empty-template",
-    "scheme": "expo-empty-template",
+    "name": "2B FiT",
+    "slug": "2b-fit",
+    "scheme": "to-be-fit",
     "version": "1.0.0",
     "orientation": "portrait",
     
@@ -19,6 +19,6 @@
       "supportsTablet": true
     },
     "android": {},
-    "web": { "bundler": "metro", "output": "static" }
+    "web": { "bundler": "metro", "output": "single" }
   }
 }
