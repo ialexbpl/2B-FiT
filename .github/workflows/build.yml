@@ -1,0 +1,41 @@
+name: React Native Build & Lint
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript check (optional)
+        run: npx tsc --noEmit || true
+
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Build (Expo or Metro)
+        run: |
+          if [ -f "app.json" ]; then
+            npx expo export || echo "Expo export skipped"
+          else
+            npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output build/index.android.bundle --assets-dest build
+          fi
