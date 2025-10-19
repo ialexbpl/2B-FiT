@@ -5,9 +5,8 @@
     "scheme": "to-be-fit",
     "version": "1.0.0",
     "orientation": "portrait",
-    
+    "icon": "./src/assets/logo.png",
     "userInterfaceStyle": "automatic",
-    
     "updates": {
       "url": "",
       "fallbackToCacheTimeout": 0
@@ -19,6 +18,9 @@
       "supportsTablet": true
     },
     "android": {},
-    "web": { "bundler": "metro", "output": "single" }
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
   }
 }
