@@ -1,65 +1,32 @@
-import {
-    View,
-    Text,
-} from 'react-native';
-import { styles } from './ProfileStyles';
+import { View, Text } from 'react-native';
+import React from 'react';
+import { makeProfileStyles } from './ProfileStyles';
+import { useTheme } from '../../context/ThemeContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 
-export const ProfileAchivment: React.FC<{ palette: any; isDark: boolean }> = ({
-    palette,
-    isDark
-}) => {
+export const ProfileAchivment: React.FC = () => {
+    const { palette } = useTheme();
+    const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
     return (
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Achivment</Text>
+            <Text style={styles.sectionTitle}>Achievement</Text>
             <View style={styles.achivmentContainer}>
                 <View style={styles.achivmentBlock}>
                     <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" />Najwieksza ilosc krokow dnia
+                        <Icon name="trophy" size={20} color="#FFD700" /> Steps
                     </Text>
                     <View>
-                        <Text style={styles.achivmentDescription}>15000</Text>
+                        <Text style={styles.achivmentDescription}>...auto</Text>
                     </View>
                 </View>
+
                 <View style={styles.achivmentBlock}>
                     <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" /> Osagniecie za
+                        <Icon name="trophy" size={20} color="#FFD700" /> Weight reduction
                     </Text>
                     <View>
-                        <Text style={styles.achivmentDescription}>900</Text>
-                    </View>
-                </View>
-                <View style={styles.achivmentBlock}>
-                    <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" /> Waga:
-                    </Text>
-                    <View>
-                        <Text style={styles.achivmentDescription}>75kg</Text>
-                    </View>
-                </View>
-                <View style={styles.achivmentBlock}>
-                    <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" /> Cel:
-                    </Text>
-                    <View>
-                        <Text style={styles.achivmentDescription}>Zredukowac wage o 5kg</Text>
-                    </View>
-                </View>
-                <View style={styles.achivmentBlock}>
-                    <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" /> Poziom aktywnosci:
-                    </Text>
-                    <View>
-                        <Text style={styles.achivmentDescription}>Sredni</Text>
-                    </View>
-                </View>
-                <View style={styles.achivmentBlock}>
-                    <Text style={styles.achivmentText}>
-                        <Icon name="trophy" size={20} color="#FFD700" /> Alergie:
-                    </Text>
-                    <View>
-                        <Text style={styles.achivmentDescription}>Brak</Text>
+                        <Text style={styles.achivmentDescription}>..auto</Text>
                     </View>
                 </View>
             </View>

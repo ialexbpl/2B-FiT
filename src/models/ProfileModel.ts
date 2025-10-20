@@ -1,24 +1,24 @@
-import { lightPalette } from '@styles/theme';
+import type { Palette } from '@styles/theme';
 
-export const ACTIVITY_LEVELS = ['Niska', 'Umiarkowana', 'Wysoka', 'Bardzo wysoka'];
-export const ALLERGY_OPTIONS = ['Gluten', 'Laktoza', 'Orzechy', 'Soja', 'Jaja', 'Ryby'];
+export const ACTIVITY_LEVELS = ['Low', 'Moderate', 'High', 'Very High'];
+export const ALLERGY_OPTIONS = ['Gluten', 'Lactose', 'Nuts', 'Soy', 'Eggs', 'Fish'];
 
 export type ModalType = 'age' | 'height' | 'weight' | 'goal' | 'activity' | 'allergies' | null;
 
 export const modalTitles: Record<Exclude<ModalType, null>, string> = {
-  age: 'Zmien wiek',
-  height: 'Zmien wzrost',
-  weight: 'Zmien wage',
-  goal: 'Ustal cel wagowy',
-  activity: 'Wybierz poziom aktywnosci',
-  allergies: 'Wybierz alergie'
+  age: 'Change age',
+  height: 'Change height',
+  weight: 'Change weight',
+  goal: 'Set target weight',
+  activity: 'Select activity level',
+  allergies: 'Select allergies',
 };
 
 export const modalPlaceholders: Record<'age' | 'height' | 'weight' | 'goal', string> = {
-  age: 'Wpisz swoj wiek',
-  height: 'Wpisz swoj wzrost (cm)',
-  weight: 'Wpisz swoja wage (kg)',
-  goal: 'Wpisz docelowa wage (kg)'
+  age: 'Enter your age',
+  height: 'Enter your height (cm)',
+  weight: 'Enter your weight (kg)',
+  goal: 'Enter target weight (kg)',
 };
 
 export const numericMaxLength: Record<'age' | 'height' | 'weight' | 'goal', number> = {
@@ -29,6 +29,5 @@ export const numericMaxLength: Record<'age' | 'height' | 'weight' | 'goal', numb
 };
 
 export type ProfileInformationsProps = {
-  palette: typeof lightPalette;
-  isDark: boolean;
+  palette: Palette;
 };

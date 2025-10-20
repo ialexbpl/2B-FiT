@@ -7,7 +7,7 @@ import {
   TextInput,
   ScrollView
 } from 'react-native';
-import { styles } from './ProfileStyles';
+import { makeProfileStyles } from '../Profile/ProfileStyles';
 import {
   ACTIVITY_LEVELS,
   ALLERGY_OPTIONS,
@@ -17,32 +17,41 @@ import {
   modalPlaceholders,
   modalTitles
 } from '../../models/ProfileModel';
-import { lightPalette } from '@styles/theme';
+import { } from '@styles/theme';
+import { useProfile } from '../../context/ProfileContext';
 
 
 
-export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
+export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
   palette,
-  isDark
 }) => {
-  const [age, setAge] = useState('25');
-  const [height, setHeight] = useState('180');
-  const [weight, setWeight] = useState('75');
-  const [goalWeight, setGoalWeight] = useState('70');
-  const [activityLevel, setActivityLevel] = useState<string | null>('Umiarkowana');
-  const [allergies, setAllergies] = useState<string[]>([]);
+  const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
+  const {
+    age,
+    height,
+    weight,
+    goalWeight,
+    activityLevel,
+    allergies,
+    setAge,
+    setHeight,
+    setWeight,
+    setGoalWeight,
+    setActivityLevel,
+    setAllergies,
+  } = useProfile();
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [draftTextValue, setDraftTextValue] = useState('');
   const [draftActivity, setDraftActivity] = useState<string | null>(activityLevel);
   const [draftAllergies, setDraftAllergies] = useState<string[]>(allergies);
 
-  const neutralBorder = isDark ? lightPalette.border : palette.border;
-  const neutralBackground = isDark ? lightPalette.card : palette.card;
-  const modalTextColor = lightPalette.text;
+  const neutralBorder = palette.border;
+  const neutralBackground = palette.card;
+  const modalTextColor = palette.text;
 
   const selectedActivity = useMemo(
-    () => (activityLevel ? activityLevel : 'Wybierz poziom'),
+    () => (activityLevel ? activityLevel : 'Select level'),
     [activityLevel]
   );
 
@@ -207,8 +216,8 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
               { borderColor: neutralBorder, backgroundColor: neutralBackground }
             ]}
           >
-            <Text style={[styles.optionChipText, { color: modalTextColor }]}>
-              Brak alergii
+            <Text style={[styles.optionChipText, { color: modalTextColor }]}> 
+              No allergies
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -234,16 +243,16 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
   return (
     <>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Informacje</Text>
+        <Text style={styles.sectionTitle}>Information</Text>
         <View style={styles.settingsContainer}>
           <TouchableOpacity
             style={styles.settingsBlock}
             activeOpacity={0.7}
             onPress={() => openModal('age')}
           >
-            <Text style={styles.settingsText}>Wiek:</Text>
+            <Text style={styles.settingsText}>Age:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {age ? `${age} lat` : 'Ustaw wiek'}
+              {age ? `${age} years` : 'Set age'}
             </Text>
           </TouchableOpacity>
 
@@ -252,9 +261,9 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
             activeOpacity={0.7}
             onPress={() => openModal('height')}
           >
-            <Text style={styles.settingsText}>Wzrost:</Text>
+            <Text style={styles.settingsText}>Height:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {height ? `${height} cm` : 'Ustaw wzrost'}
+              {height ? `${height} cm` : 'Set height'}
             </Text>
           </TouchableOpacity>
 
@@ -263,9 +272,9 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
             activeOpacity={0.7}
             onPress={() => openModal('weight')}
           >
-            <Text style={styles.settingsText}>Waga:</Text>
+            <Text style={styles.settingsText}>Weight:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {weight ? `${weight} kg` : 'Ustaw wage'}
+              {weight ? `${weight} kg` : 'Set weight'}
             </Text>
           </TouchableOpacity>
 
@@ -274,9 +283,9 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
             activeOpacity={0.7}
             onPress={() => openModal('goal')}
           >
-            <Text style={styles.settingsText}>Cel:</Text>
+            <Text style={styles.settingsText}>Target:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {goalWeight ? `${goalWeight} kg` : 'Ustal cel wagowy'}
+              {goalWeight ? `${goalWeight} kg` : 'Set target weight'}
             </Text>
           </TouchableOpacity>
 
@@ -285,7 +294,7 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
             activeOpacity={0.7}
             onPress={() => openModal('activity')}
           >
-            <Text style={styles.settingsText}>Poziom aktywnosci:</Text>
+            <Text style={styles.settingsText}>Activity level:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
               {selectedActivity}
             </Text>
@@ -296,9 +305,9 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
             activeOpacity={0.7}
             onPress={() => openModal('allergies')}
           >
-            <Text style={styles.settingsText}>Alergie:</Text>
+            <Text style={styles.settingsText}>Allergies:</Text>
             <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {allergies.length ? allergies.join(', ') : 'Brak alergii'}
+              {allergies.length ? allergies.join(', ') : 'No allergies'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -331,15 +340,15 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
                       { borderColor: neutralBorder, backgroundColor: neutralBackground }
                     ]}
                   >
-                    <Text style={[styles.modalButtonText, { color: modalTextColor }]}>
-                      Anuluj
+                    <Text style={[styles.modalButtonText, { color: modalTextColor }]}> 
+                      Cancel
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleModalSave}
                     style={[styles.modalButton, styles.modalPrimaryButton]}
                   >
-                    <Text style={styles.modalPrimaryButtonText}>Zapisz</Text>
+                    <Text style={styles.modalPrimaryButtonText}>Save</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -351,4 +360,4 @@ export const ProfileInformations: React.FC<ProfileInformationsProps> = ({
   );
 };
 
-export default ProfileInformations;
+export default SettingProfileInfo;

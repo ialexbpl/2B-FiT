@@ -1,8 +1,11 @@
 import React from 'react';
-import { StatusBar, useColorScheme } from 'react-native';
+import { StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { RootTabs } from '@navigation/RootTabs';
+import { ThemeProvider } from './src/context/ThemeContext';
+import { ProfileProvider } from './src/context/ProfileContext';
+import { useTheme } from './src/context/ThemeContext';
 
 /*
   App root
@@ -13,16 +16,26 @@ import { RootTabs } from '@navigation/RootTabs';
   - Everything is Expo Go–compatible, no custom native code required.
 */
 
-export default function App() {
-  const isDark = useColorScheme() === 'dark';
+function AppShell() {
+  const { isDark, palette } = useTheme();
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: isDark ? '#000' : '#fff' }}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <ProfileProvider>
         <NavigationContainer>
           <RootTabs />
         </NavigationContainer>
-      </SafeAreaView>
+      </ProfileProvider>
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppShell />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
