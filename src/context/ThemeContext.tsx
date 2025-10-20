@@ -1,48 +1,43 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
+import { theme as baseTheme, paletteLight, paletteDark, type Palette } from '@styles/theme';
 
-type Theme = {
-  mode: 'light' | 'dark';
-  colors: {
-    background: string;
-    text: string;
-    primary: string;
-  };
-};
+export type ThemeMode = 'light' | 'dark';
 
-type ThemeContextValue = {
-  theme: Theme;
+//logic of changing themes
+
+export type AppThemeContextValue = {
+  mode: ThemeMode;
+  isDark: boolean;
+  // Static design tokens (spacing, radii, brand colors etc.)
+  theme: typeof baseTheme;
+  // Dynamic palette based on mode
+  palette: Palette;
   toggle: () => void;
 };
 
-const defaultTheme: Theme = {
+const defaultValue: AppThemeContextValue = {
   mode: 'light',
-  colors: {
-    background: '#ffffff',
-    text: '#111111',
-    primary: '#3b82f6',
-  },
+  isDark: false,
+  theme: baseTheme,
+  palette: paletteLight,
+  toggle: () => {},
 };
 
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: defaultTheme,
-  toggle: () => {},
-});
+const ThemeContext = createContext<AppThemeContextValue>(defaultValue);
 
 export const ThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const [mode, setMode] = useState<'light' | 'dark'>('light');
-  const theme = useMemo<Theme>(() => ({
-    mode,
-    colors: {
-      background: mode === 'dark' ? '#000000' : '#ffffff',
-      text: mode === 'dark' ? '#ffffff' : '#111111',
-      primary: '#3b82f6',
-    },
-  }), [mode]);
+  const [mode, setMode] = useState<ThemeMode>('light');
 
-  const value = useMemo<ThemeContextValue>(() => ({
-    theme,
-    toggle: () => setMode(m => (m === 'dark' ? 'light' : 'dark')),
-  }), [theme]);
+  const value = useMemo<AppThemeContextValue>(() => {
+    const isDark = mode === 'dark';
+    return {
+      mode,
+      isDark,
+      theme: baseTheme,
+      palette: isDark ? paletteDark : paletteLight,
+      toggle: () => setMode(m => (m === 'dark' ? 'light' : 'dark')),
+    };
+  }, [mode]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
