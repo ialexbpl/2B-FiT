@@ -7,6 +7,8 @@ import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, Pressable, Platform } from 'react-native';
+import { Setting } from '@screens/Settings/Setting';
+import { useTheme } from '../context/ThemeContext';
 
 /*
   Bottom tabs (my main navigation)
@@ -19,6 +21,7 @@ import { View, Text, Pressable, Platform } from 'react-native';
 const Tab = createBottomTabNavigator();
 
 function AITabButton({ onPress, accessibilityState }: any) {
+  const { theme, palette } = useTheme();
   const focused = accessibilityState?.selected;
   return (
     <Pressable
@@ -36,7 +39,7 @@ function AITabButton({ onPress, accessibilityState }: any) {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: focused ? '#3ab535ff' : '#afb3bbff',
+          backgroundColor: focused ? theme.colors.primary : '#afb3bbff',
           justifyContent: 'center',
           alignItems: 'center',
           shadowColor: '#000',
@@ -48,20 +51,23 @@ function AITabButton({ onPress, accessibilityState }: any) {
       >
         <Ionicons name="flask" size={24} color="#fff" />
       </View>
-      <Text style={{ fontSize: 12, marginTop: 2, color: focused ? '#3ab535ff' : '#6b7280' }}>AI</Text>
+      <Text style={{ fontSize: 12, marginTop: 2, color: focused ? theme.colors.primary : palette.subText }}>AI</Text>
     </Pressable>
   );
 }
 
 export function RootTabs() {
+  const { theme, palette } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#3ab535ff',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: palette.subText,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 84 : 64,
+          backgroundColor: palette.card,
+          borderTopColor: palette.border,
+          height: Platform.OS === 'ios' ? 80 : 64,
           paddingBottom: Platform.OS === 'ios' ? 24 : 10,
           paddingTop: 8,
         },
@@ -78,7 +84,7 @@ export function RootTabs() {
           return <Icon name={iconName as any} size={size} color={color} />;
         },
       })}
-    >
+  >
       <Tab.Screen name="Dashboard" component={Dashboard} />
       <Tab.Screen name="Meals" component={Meals} />
       <Tab.Screen
@@ -91,6 +97,14 @@ export function RootTabs() {
       />
       <Tab.Screen name="Stats" component={Stats} />
       <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen
+        name="Settings"
+        component={Setting}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
     </Tab.Navigator>
   );
 }
