@@ -1,3 +1,4 @@
+//This is the theme file defining design tokens and color palettes for light and dark modes globally
 
 //import type { ImageSourcePropType }from 'react-native';
 //import bgLight from '../assets/images/bg_light.png';
