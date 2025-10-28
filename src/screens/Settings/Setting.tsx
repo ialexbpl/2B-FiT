@@ -14,7 +14,6 @@ export const Setting: React.FC = () => {
 
   return (//added ImageBackground to test 
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-       <ImageBackground source={palette.backgroundImage} resizeMode="cover" style={{ flex: 1, backgroundColor: palette.background }}>
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
@@ -53,9 +52,7 @@ export const Setting: React.FC = () => {
             <SettingProfileInfo palette={palette} />
           </View>
         </ScrollView>
-    
-     </ImageBackground>
-    </View>//added ImageBackground to test 
+    </View>//added ImageBackground to test
   );
 };
 
