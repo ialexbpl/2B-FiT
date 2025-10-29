@@ -15,15 +15,19 @@ import {
   ProfileInformationsProps,
   numericMaxLength,
   modalPlaceholders,
-  modalTitles
+  modalTitles,
+  modalDescriptions
 } from '../../models/ProfileModel';
-import { } from '@styles/theme';
 import { useProfile } from '../../context/ProfileContext';
+import Icon from 'react-native-vector-icons/Ionicons';
 
+type SettingProfileInfoProps = ProfileInformationsProps & {
+  layout?: 'default' | 'inline';
+};
 
-
-export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
+export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   palette,
+  layout = 'default',
 }) => {
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
   const {
@@ -53,6 +57,60 @@ export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
   const selectedActivity = useMemo(
     () => (activityLevel ? activityLevel : 'Select level'),
     [activityLevel]
+  );
+
+  const editCards = useMemo(
+    () => [
+      {
+        key: 'age',
+        type: 'age' as ModalType,
+        label: 'Age',
+        value: age ? `${age} years` : 'Set age',
+        helper: 'Tap to update',
+        icon: 'calendar-outline',
+      },
+      {
+        key: 'height',
+        type: 'height' as ModalType,
+        label: 'Height',
+        value: height ? `${height} cm` : 'Set height',
+        helper: 'Tap to update',
+        icon: 'resize-outline',
+      },
+      {
+        key: 'weight',
+        type: 'weight' as ModalType,
+        label: 'Weight',
+        value: weight ? `${weight} kg` : 'Set weight',
+        helper: 'Tap to update',
+        icon: 'barbell-outline',
+      },
+      {
+        key: 'goal',
+        type: 'goal' as ModalType,
+        label: 'Target',
+        value: goalWeight ? `${goalWeight} kg` : 'Set target weight',
+        helper: 'Define your goal',
+        icon: 'flag-outline',
+      },
+      {
+        key: 'activity',
+        type: 'activity' as ModalType,
+        label: 'Activity level',
+        value: selectedActivity,
+        helper: 'Choose your routine',
+        icon: 'pulse-outline',
+      },
+      {
+        key: 'allergies',
+        type: 'allergies' as ModalType,
+        label: 'Allergies',
+        value: allergies.length ? allergies.join(', ') : 'No allergies',
+        helper: 'Manage list',
+        icon: 'leaf-outline',
+      },
+    ],
+    [age, height, weight, goalWeight, selectedActivity, allergies],
   );
 
   const openModal = (type: ModalType) => {
@@ -216,7 +274,7 @@ export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
               { borderColor: neutralBorder, backgroundColor: neutralBackground }
             ]}
           >
-            <Text style={[styles.optionChipText, { color: modalTextColor }]}> 
+            <Text style={[styles.optionChipText, { color: modalTextColor }]}>
               No allergies
             </Text>
           </TouchableOpacity>
@@ -240,76 +298,39 @@ export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
     );
   };
 
+  const sectionWrapperStyle =
+    layout === 'inline' ? styles.inlineSection : styles.section;
+  const sectionTitleStyle =
+    layout === 'inline' ? styles.inlineSectionTitle : styles.sectionTitle;
+  const containerStyle =
+    layout === 'inline' ? styles.inlineSettingsContainer : styles.settingsContainer;
+
   return (
     <>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Information</Text>
-        <View style={styles.settingsContainer}>
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('age')}
-          >
-            <Text style={styles.settingsText}>Age:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {age ? `${age} years` : 'Set age'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('height')}
-          >
-            <Text style={styles.settingsText}>Height:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {height ? `${height} cm` : 'Set height'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('weight')}
-          >
-            <Text style={styles.settingsText}>Weight:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {weight ? `${weight} kg` : 'Set weight'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('goal')}
-          >
-            <Text style={styles.settingsText}>Target:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {goalWeight ? `${goalWeight} kg` : 'Set target weight'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('activity')}
-          >
-            <Text style={styles.settingsText}>Activity level:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {selectedActivity}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsBlock}
-            activeOpacity={0.7}
-            onPress={() => openModal('allergies')}
-          >
-            <Text style={styles.settingsText}>Allergies:</Text>
-            <Text style={[styles.settingsValue, { color: palette.subText }]}>
-              {allergies.length ? allergies.join(', ') : 'No allergies'}
-            </Text>
-          </TouchableOpacity>
+      <View style={sectionWrapperStyle}>
+        <Text style={sectionTitleStyle}>Information</Text>
+        <View style={containerStyle}>
+          {editCards.map(card => (
+            <TouchableOpacity
+              key={card.key}
+              style={styles.settingsBlock}
+              activeOpacity={0.85}
+              onPress={() => openModal(card.type)}
+            >
+              <View style={[styles.settingsIconWrap, { backgroundColor: `${palette.primary}14` }]}>
+                <Icon name={card.icon} size={20} color={palette.primary} />
+              </View>
+              <Text style={styles.settingsText}>{card.label}</Text>
+              <Text
+                style={[styles.settingsValue, { color: palette.text }]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {card.value}
+              </Text>
+              <Text style={[styles.settingsHelper, { color: palette.subText }]}>{card.helper}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -331,6 +352,9 @@ export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
                 <Text style={[styles.modalTitle, { color: modalTextColor }]}>
                   {modalTitles[activeModal]}
                 </Text>
+                <Text style={styles.modalSubtitle}>
+                  {modalDescriptions[activeModal]}
+                </Text>
                 {renderModalBody()}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
@@ -340,7 +364,7 @@ export const SettingProfileInfo: React.FC<ProfileInformationsProps> = ({
                       { borderColor: neutralBorder, backgroundColor: neutralBackground }
                     ]}
                   >
-                    <Text style={[styles.modalButtonText, { color: modalTextColor }]}> 
+                    <Text style={[styles.modalButtonText, { color: modalTextColor }]}>
                       Cancel
                     </Text>
                   </TouchableOpacity>
