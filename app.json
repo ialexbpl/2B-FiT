@@ -6,7 +6,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/logo.png",
-    "userInterfaceStyle": "automatic",
     "updates": {
       "url": "",
       "fallbackToCacheTimeout": 0
@@ -18,14 +17,15 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.anonymous.x2bfit"
+      "package": "com.axel2004b.x2bfit"
     },
     "web": {
       "bundler": "metro",
       "output": "single"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ]
   }
 }

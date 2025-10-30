@@ -27,7 +27,7 @@ export const Setting: React.FC = () => {
 
   return (//added ImageBackground to test 
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <ImageBackground source={palette.backgroundImage} resizeMode="cover" style={{ flex: 1, backgroundColor: palette.background }}>
+      
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
@@ -42,7 +42,7 @@ export const Setting: React.FC = () => {
 
 
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} >
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <View style={{ flexShrink: 1, paddingRight: 12 }}>
@@ -115,7 +115,7 @@ export const Setting: React.FC = () => {
           </View>
         </ScrollView>
 
-      </ImageBackground>
+      
     </View>
   );
 };
