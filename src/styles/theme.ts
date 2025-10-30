@@ -1,7 +1,8 @@
+//This is the theme file defining design tokens and color palettes for light and dark modes globally
 
-import type { ImageSourcePropType }from 'react-native';
-import bgLight from '../assets/images/bg_light.png';
-import bgDark from '../assets/images/bg_dark.png';
+//import type { ImageSourcePropType }from 'react-native';
+//import bgLight from '../assets/images/bg_light.png';
+//import bgDark from '../assets/images/bg_dark.png';
 
 
 // Design tokens (brand and primitives)
@@ -37,31 +38,31 @@ export type Palette = {
   primary: string;      // primary interactive color (tracks etc.)
   onPrimary: string;    // text/icon on primary backgrounds
   overlay: string;      // modal overlay color
-  backgroundImage?: ImageSourcePropType; // option background image
+ // backgroundImage?: ImageSourcePropType; // option background image
 };
 
 export const paletteLight: Palette = {
   background: '#F7F8FA',
-  card: '#FFFFFF',
+  card: '#ffffff52',
   text: '#0F172A',
   subText: '#64748B',
   border: '#E2E8F0',
   primary: theme.colors.primary,
   onPrimary: '#FFFFFF',
   overlay: 'rgba(15, 23, 42, 0.45)',
-  backgroundImage: bgLight,
+ // backgroundImage: bgLight,
 };
 
 export const paletteDark: Palette = {
-  background: '#0C1220',
-  card: 'rgba(52, 52, 52, 0.21)',//added transparent to test
+  background: '#151a25ff',
+  card: 'rgba(48, 52, 57, 0.09)',//added transparent to test
   text: '#F8FAFC',
   subText: '#94A3B8',
   border: '#273244',
   primary: theme.colors.primary,
   onPrimary: '#0B1A13',
   overlay: 'rgba(0, 0, 0, 0.55)',
-  backgroundImage: bgDark,
+ // backgroundImage: bgDark,
 };
 
 // Backward-compatible aliases (if some modules still import these names)

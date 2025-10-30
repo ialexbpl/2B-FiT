@@ -8,7 +8,38 @@ export const Dashboard: React.FC = () => {
   const { palette } = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.background }}>
+
+
+
+
+
+
+
+
+
+
+      
       <Text style={{ color: palette.text }}>Dashboard</Text>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     </SafeAreaView>
   );
 };
