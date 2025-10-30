@@ -14,6 +14,15 @@ export const modalTitles: Record<Exclude<ModalType, null>, string> = {
   allergies: 'Select allergies',
 };
 
+export const modalDescriptions: Record<Exclude<ModalType, null>, string> = {
+  age: 'Adjust your age so we can personalize your plan.',
+  height: 'Keep your height current for precise calculations.',
+  weight: 'Update the latest number from the scale.',
+  goal: 'Set a target weight that motivates you.',
+  activity: 'Pick the activity level that matches your routine.',
+  allergies: 'Select ingredients you want us to avoid.',
+};
+
 export const modalPlaceholders: Record<'age' | 'height' | 'weight' | 'goal', string> = {
   age: 'Enter your age',
   height: 'Enter your height (cm)',

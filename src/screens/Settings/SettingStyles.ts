@@ -48,6 +48,55 @@ export const makeSettingStyles = (palette: Palette) =>
       fontSize: 13,
       marginTop: 4,
     },
+    actionButtons: {
+      marginTop: 16,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.card,
+      ...theme.shadow.sm,
+      marginTop: 12,
+    },
+    actionButtonFirst: {
+      marginTop: 0,
+    },
+    actionButtonPressed: {
+      opacity: 0.85,
+    },
+    actionIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+      backgroundColor: `${palette.primary}14`,
+    },
+    actionTextWrap: {
+      flex: 1,
+    },
+    actionTitle: {
+      color: palette.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    actionSubtitle: {
+      color: palette.subText,
+      fontSize: 13,
+      marginTop: 4,
+    },
+    cardDivider: {
+      height: 1,
+      backgroundColor: palette.border,
+      marginTop: 20,
+      marginBottom: 16,
+    },
     sectionSpacer: {
       height: 12,
     },
