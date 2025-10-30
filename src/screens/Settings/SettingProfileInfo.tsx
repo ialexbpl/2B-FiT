@@ -344,7 +344,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: neutralBackground, borderColor: neutralBorder }
+              { backgroundColor: palette.card100, borderColor: neutralBorder }
             ]}
           >
             {activeModal && (

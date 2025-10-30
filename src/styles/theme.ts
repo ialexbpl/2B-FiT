@@ -31,7 +31,8 @@ export const theme = {
 
 export type Palette = {
   background: string;   // app background
-  card: string;         // surfaces, cards
+  card: string;  
+  card100: string;         // surfaces, cards
   text: string;         // primary text
   subText: string;      // secondary/muted text
   border: string;       // hairlines and borders
@@ -44,6 +45,7 @@ export type Palette = {
 export const paletteLight: Palette = {
   background: '#F7F8FA',
   card: '#ffffff52',
+  card100: '#ffffffff',
   text: '#0F172A',
   subText: '#64748B',
   border: '#E2E8F0',
@@ -55,7 +57,8 @@ export const paletteLight: Palette = {
 
 export const paletteDark: Palette = {
   background: '#151a25ff',
-  card: 'rgba(48, 52, 57, 0.09)',//added transparent to test
+  card: 'rgba(48, 52, 57, 0.08)',//added transparent to test
+  card100: '#151a25ff',//added transparent to test
   text: '#F8FAFC',
   subText: '#94A3B8',
   border: '#273244',
