@@ -3,13 +3,17 @@ import { ScrollView, View, Text, Pressable, Switch, ImageBackground, Alert } fro
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import SettingProfileInfo from './SettingProfileInfo';
 import { makeSettingStyles } from './SettingStyles';
+
+
 
 
 export const Setting: React.FC = () => {
   const navigation = useNavigation();
   const { palette, theme, isDark, toggle } = useTheme();
+  const { signOut } = useAuth();
   const styles = React.useMemo(() => makeSettingStyles(palette), [palette]);
   const handleChangeLogin = React.useCallback(() => {
     Alert.alert(
@@ -103,6 +107,31 @@ export const Setting: React.FC = () => {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={palette.subText} />
               </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  pressed && styles.actionButtonPressed,
+                ]}
+                onPress={async () => {
+                  try {
+                    await signOut();
+                  } catch (e: any) {
+                    Alert.alert('Sign out failed', e?.message ?? String(e));
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+              >
+                <View style={styles.actionIconWrap}>
+                  <Ionicons name="log-out-outline" size={20} color={palette.primary} />
+                </View>
+                <View style={styles.actionTextWrap}>
+                  <Text style={styles.actionTitle}>Sign Out</Text>
+                  <Text style={styles.actionSubtitle}>Sign out of your account.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={palette.subText} />
+              </Pressable>
             </View>
 
 
@@ -113,10 +142,10 @@ export const Setting: React.FC = () => {
           <View style={styles.card}>
             <SettingProfileInfo palette={palette} layout="inline" />
           </View>
+         
         </ScrollView>
 
-      
-    </View>
+      </View>
   );
 };
 
