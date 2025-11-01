@@ -1,0 +1,18 @@
+// Supabase client configured to use AsyncStorage for session persistence.
+// This avoids SecureStore's 2KB value limit warnings.
+// src/utils/supabase.ts
+import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      storage: AsyncStorage as any,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
+);

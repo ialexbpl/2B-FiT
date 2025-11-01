@@ -1,29 +1,25 @@
+// App.tsx
 import React from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { RootTabs } from '@navigation/RootTabs';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ProfileProvider } from './src/context/ProfileContext';
-import { useTheme } from './src/context/ThemeContext';
-
-/*
-  App root
-  - I wrap the whole app in SafeAreaProvider/SafeAreaView so layouts
-    respect device notches and insets on iOS/Android.
-  - NavigationContainer holds the navigation state for the app.
-  - RootTabs renders my bottom tabs: Dashboard, Meals, AI, Stats, Profile.
-  - Everything is Expo Go–compatible, no custom native code required.
-*/
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import Login from '@screens/Login/Login';
 
 function AppShell() {
   const { isDark, palette } = useTheme();
+  const { isLoggedIn, isLoading } = useAuth();
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ProfileProvider>
         <NavigationContainer>
-          <RootTabs />
+          {/* Simple gate: you can swap to a Stack later if desired */}
+          {isLoading ? null : isLoggedIn ? <RootTabs /> : <Login />}
         </NavigationContainer>
       </ProfileProvider>
     </SafeAreaView>
@@ -34,7 +30,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppShell />
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
