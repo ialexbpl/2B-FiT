@@ -1,47 +1,38 @@
-import React from 'react';
-import { Text } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '@context/ThemeContext';
+import { makeDashboardStyles } from './DashboardStyles';
+import { SearchBar } from './SearchBar';
+import { StepsCard } from './StepsCard';
+import { WeightCard } from './WeightCard';
+import { SleepChart } from './SleepChart';
+import { FoodIntake } from './FoodIntake';
 
-// Dashboard screen placeholder — I’ll build the main overview here.
 export const Dashboard: React.FC = () => {
-  const { palette } = useTheme();
-  return (
-    <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.background }}>
+    const { palette, theme } = useTheme();
+    const styles = useMemo(() => makeDashboardStyles(palette, theme), [palette, theme]);
 
+    return (
+        <SafeAreaView style={styles.screen}>
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                {/* Search Bar */}
+                <SearchBar styles={styles} palette={palette} />
 
+                {/* Stats Cards Row */}
+                <View style={styles.statsRow}>
+                    <StepsCard styles={styles} palette={palette} />
+                    <WeightCard styles={styles} palette={palette} />
+                </View>
 
+                {/* Sleep Chart */}
+                <SleepChart styles={styles} palette={palette} />
 
-
-
-
-
-
-
-      
-      <Text style={{ color: palette.text }}>Dashboard</Text>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    </SafeAreaView>
-  );
+                {/* Food Intake */}
+                <FoodIntake styles={styles} palette={palette} />
+            </ScrollView>
+        </SafeAreaView>
+    );
 };
 
 export default Dashboard;
