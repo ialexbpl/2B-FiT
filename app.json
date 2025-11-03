@@ -27,7 +27,19 @@
       "expo-font",
       "expo-secure-store",
       "expo-sqlite",
-      "expo-web-browser"
+      "expo-web-browser",
+       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F8FA",
+          "image": "./src/assets/logo.png",
+          "imageWidth": 250,
+          "dark": {
+            "backgroundColor": "#151a25ff",
+            "image": "./src/assets/logo.png"
+          }
+        }
+      ]
     ]
   }
 }
