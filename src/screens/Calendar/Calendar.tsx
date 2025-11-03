@@ -27,7 +27,7 @@ moment.updateLocale('en', { week: { dow: 1 } });
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ROW_HEIGHT = 96;
 
-type ActivityType = 'workout' | 'meal' | 'recovery';
+type ActivityType = 'workout' | 'meal' | 'other';
 
 type CalendarEvent = {
   id: string;
@@ -41,11 +41,11 @@ type CalendarEvent = {
 const TYPE_COLORS: Record<ActivityType, string> = {
   workout: '#22c55e',
   meal: '#f59e0b',
-  recovery: '#60a5fa',
+  other: '#60a5fa',
 };
 
 const typeLabel = (t: ActivityType) =>
-  t === 'workout' ? 'Workout' : t === 'meal' ? 'Meal' : 'Recovery';
+  t === 'workout' ? 'Workout' : t === 'meal' ? 'Meal' : 'Other';
 
 const toDateKey = (d: Date) => moment(d).format('YYYY-MM-DD');
 const isHHMM = (v: string) => /^\d{2}:\d{2}$/.test(v);
@@ -354,7 +354,7 @@ export default function Calendar() {
                 </View>
 
                 <View style={styles.segmentRow}>
-                  {(['workout', 'meal', 'recovery'] as ActivityType[]).map(t => {
+                  {(['workout', 'meal', 'other'] as ActivityType[]).map(t => {
                     const active = formType === t;
                     return (
                       <Pressable
@@ -503,6 +503,7 @@ const TimeField: React.FC<{
   palette: any;
   minuteStep?: number;
 }> = ({ label, value, onChange, style, palette, minuteStep = 5 }) => {
+  const { isDark } = useTheme();
   const [open, setOpen] = React.useState(false);
 
   const current = React.useMemo(() => {
@@ -546,7 +547,7 @@ const TimeField: React.FC<{
         <Text style={{ color: palette.subText, fontWeight: '700' }}>⌵</Text>
       </Pressable>
 
-      {open && (
+      {open && ( //Set: display={Platform.OS === 'ios' ? 'compact' : 'default'}
         Platform.OS === 'ios' ? (
           <View
             style={{
@@ -554,7 +555,8 @@ const TimeField: React.FC<{
               borderWidth: 1,
               borderColor: palette.border,
               borderRadius: 12,
-              backgroundColor: palette.card,
+              // Use opaque card background to ensure wheel text contrast
+              backgroundColor: palette.card100,
               overflow: 'hidden',
             }}
           >
@@ -562,6 +564,10 @@ const TimeField: React.FC<{
               value={current}
               mode="time"
               display="spinner"
+              // Force visible text color and correct theme on iOS
+              themeVariant={isDark ? 'dark' : 'light'}
+              textColor={palette.text}
+              style={{ height: 216 }}
               onChange={(_, d) => {
                 if (!d) return;
                 onChange(dateToHHMM(roundToStep(d, minuteStep)));
