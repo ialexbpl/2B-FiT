@@ -2,6 +2,11 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@utils/supabase';
 import { profileCache } from '@utils/db';
+import { Platform } from 'react-native';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type ProfileRow = {
     id: string;
@@ -39,6 +44,25 @@ const AuthContext = createContext<AuthValue>({
     sendPhoneOtp: async () => { },
     signOut: async () => { },
 });
+
+const resolveRedirectUrl = () => {
+    const envRedirect = process.env.EXPO_PUBLIC_SUPABASE_REDIRECT_URL;
+    if (envRedirect && envRedirect.length > 0) {
+        return envRedirect;
+    }
+    if (Platform.OS === 'web') {
+        const webRedirect = process.env.EXPO_PUBLIC_SUPABASE_REDIRECT_URL_WEB;
+        if (webRedirect && webRedirect.length > 0) {
+            return webRedirect;
+        }
+    }
+    return makeRedirectUri({
+        scheme: 'to-be-fit',
+        path: 'auth-callback',
+        preferLocalhost: false,
+        native: 'to-be-fit://auth-callback',
+    });
+};
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -136,7 +160,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     };
 
     const resetPassword = async (email: string) => {
-        const redirectTo = process.env.EXPO_PUBLIC_SUPABASE_REDIRECT_URL;
+        const redirectTo = resolveRedirectUrl();
         const { error } = await supabase.auth.resetPasswordForEmail(
             email,
             redirectTo ? { redirectTo } : undefined
@@ -145,12 +169,74 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     };
 
     const signInWithOAuth = async (provider: 'google') => {
-        const redirectTo = process.env.EXPO_PUBLIC_SUPABASE_REDIRECT_URL;
-        const { error } = await supabase.auth.signInWithOAuth({
+        const redirectTo = resolveRedirectUrl();
+        const { data, error } = await supabase.auth.signInWithOAuth({
             provider,
-            options: redirectTo ? { redirectTo } : undefined,
+            options: {
+                redirectTo,
+                skipBrowserRedirect: Platform.OS === 'web',
+            },
         });
         if (error) throw error;
+
+        if (!data?.url) {
+            throw new Error('OAuth URL not returned. Check provider configuration.');
+        }
+
+        if (Platform.OS === 'web') {
+            window.location.assign(data.url);
+            return;
+        }
+
+        const authResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (authResult.type === 'success' && authResult.url) {
+            const params: Record<string, string> = {};
+            const collect = (raw: string | undefined) => {
+                if (!raw) return;
+                raw.split('&').forEach((pair) => {
+                    if (!pair) return;
+                    const [rawKey, rawValue = ''] = pair.split('=');
+                    if (!rawKey) return;
+                    const key = decodeURIComponent(rawKey);
+                    if (key in params) return;
+                    params[key] = decodeURIComponent(rawValue);
+                });
+            };
+
+            const queryIndex = authResult.url.indexOf('?');
+            if (queryIndex >= 0) {
+                const hashIndex = authResult.url.indexOf('#', queryIndex);
+                collect(authResult.url.slice(
+                    queryIndex + 1,
+                    hashIndex >= 0 ? hashIndex : undefined
+                ));
+            }
+            const hashIndex = authResult.url.indexOf('#');
+            if (hashIndex >= 0) {
+                collect(authResult.url.slice(hashIndex + 1));
+            }
+
+            const accessToken = params['access_token'];
+            const refreshToken = params['refresh_token'];
+            if (accessToken && refreshToken) {
+                const { error: sessionError } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
+                if (sessionError) throw sessionError;
+            } else {
+                const authCode = params['code'];
+                if (!authCode) {
+                    throw new Error('OAuth redirect missing tokens. Check Supabase configuration.');
+                }
+                const { error: sessionError } = await supabase.auth.exchangeCodeForSession(authCode);
+                if (sessionError) throw sessionError;
+            }
+        } else if (authResult.type === 'cancel' || authResult.type === 'dismiss') {
+            return;
+        } else if (authResult.type === 'locked') {
+            throw new Error('Authentication session locked. Try again.');
+        }
     };
 
     const sendPhoneOtp = async (phone: string) => {
