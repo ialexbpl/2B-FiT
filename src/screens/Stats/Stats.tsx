@@ -1,8 +1,7 @@
-// src/screens/Stats/Stats.tsx
 import React from 'react';
 import { Text, ScrollView, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import Calendar from '../Calendar/Calendar'; // dostosuj ścieżkę, jeśli masz alias @screens
+import Calendar from '../Calendar/Calendar';
 
 export const Stats: React.FC = () => {
   const { palette } = useTheme();
@@ -12,15 +11,6 @@ export const Stats: React.FC = () => {
       <ScrollView
         style={{ flex: 1, backgroundColor: palette.background }} >
         <Calendar />
-
-
-
-
-
-
-
-
-
 
       </ScrollView>
   );
