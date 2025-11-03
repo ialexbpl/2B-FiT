@@ -14,7 +14,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tofitlabs.mobile"
     },
     "android": {
       "package": "com.axel2004b.x2bfit"
