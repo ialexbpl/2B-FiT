@@ -2,10 +2,15 @@ import type { Palette } from '@styles/theme';
 
 export const ACTIVITY_LEVELS = ['Low', 'Moderate', 'High', 'Very High'];
 export const ALLERGY_OPTIONS = ['Gluten', 'Lactose', 'Nuts', 'Soy', 'Eggs', 'Fish'];
+export const SEX_OPTIONS = ['Male', 'Female'] as const;
 
-export type ModalType = 'age' | 'height' | 'weight' | 'goal' | 'activity' | 'allergies' | null;
+export type Sex = typeof SEX_OPTIONS[number];
+
+export type ModalType = 'age' | 'height' | 'weight' | 'goal' | 'activity' | 'allergies' | 'sex'| null;
+
 
 export const modalTitles: Record<Exclude<ModalType, null>, string> = {
+  sex: 'Select your gender',
   age: 'Change age',
   height: 'Change height',
   weight: 'Change weight',
@@ -15,6 +20,7 @@ export const modalTitles: Record<Exclude<ModalType, null>, string> = {
 };
 
 export const modalDescriptions: Record<Exclude<ModalType, null>, string> = {
+  sex: 'Choose your gender to calculate your BMR.',
   age: 'Adjust your age so we can personalize your plan.',
   height: 'Keep your height current for precise calculations.',
   weight: 'Update the latest number from the scale.',
