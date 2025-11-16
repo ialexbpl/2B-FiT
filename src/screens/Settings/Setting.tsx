@@ -1,26 +1,85 @@
 import React from 'react';
-import { ScrollView, View, Text, Pressable, Switch, ImageBackground, Alert } from 'react-native';
+import { ScrollView, View, Text, Pressable, Switch, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import SettingProfileInfo from './SettingProfileInfo';
 import { makeSettingStyles } from './SettingStyles';
+import { supabase } from '@utils/supabase';
+import type { ModalType } from '../../models/ProfileModel';
 
 
 
 
 export const Setting: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const { palette, theme, isDark, toggle } = useTheme();
-  const { signOut } = useAuth();
+  const { signOut, profile, session, refreshProfile } = useAuth();
   const styles = React.useMemo(() => makeSettingStyles(palette), [palette]);
-  const handleChangeLogin = React.useCallback(() => {
-    Alert.alert(
-      'Change login',
-      'Adjust the username connected with your account to keep your profile up to date.'
-    );
-  }, []);
+  const [usernameModalVisible, setUsernameModalVisible] = React.useState(false);
+  const [usernameInput, setUsernameInput] = React.useState(profile?.username ?? '');
+  const [usernameError, setUsernameError] = React.useState<string | null>(null);
+  const [isUsernameSaving, setIsUsernameSaving] = React.useState(false);
+  const [pendingFocusModal, setPendingFocusModal] = React.useState<ModalType | null>(null);
+  const [profileInfoOffset, setProfileInfoOffset] = React.useState(0);
+  const scrollRef = React.useRef<ScrollView | null>(null);
+
+  const openUsernameModal = React.useCallback(() => {
+    setUsernameInput(profile?.username ?? '');
+    setUsernameError(null);
+    setUsernameModalVisible(true);
+  }, [profile?.username]);
+
+  const closeUsernameModal = React.useCallback(() => {
+    if (!isUsernameSaving) {
+      setUsernameModalVisible(false);
+    }
+  }, [isUsernameSaving]);
+
+  const handleSaveUsername = React.useCallback(async () => {
+    const trimmed = usernameInput.trim();
+    if (!session?.user?.id) {
+      setUsernameError('You must be signed in.');
+      return;
+    }
+    if (trimmed.length < 3) {
+      setUsernameError('Username must be at least 3 characters.');
+      return;
+    }
+    setIsUsernameSaving(true);
+    setUsernameError(null);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ username: trimmed })
+        .eq('id', session.user.id);
+      if (error) {
+        throw error;
+      }
+      await refreshProfile();
+      setUsernameModalVisible(false);
+      Alert.alert('Username updated', 'Your username has been changed.');
+    } catch (err: any) {
+      setUsernameError(err?.message ?? 'Failed to update username.');
+    } finally {
+      setIsUsernameSaving(false);
+    }
+  }, [refreshProfile, session?.user?.id, usernameInput]);
+
+  const focusModalParam = route?.params?.focusModal as ModalType | undefined;
+
+  React.useEffect(() => {
+    if (focusModalParam) {
+      setPendingFocusModal(focusModalParam);
+      setTimeout(() => {
+        const y = Math.max(profileInfoOffset - 16, 0);
+        scrollRef.current?.scrollTo({ y, animated: true });
+      }, 60);
+      (navigation as any)?.setParams?.({ focusModal: undefined });
+    }
+  }, [focusModalParam, navigation, profileInfoOffset]);
 
   const handleChangePassword = React.useCallback(() => {
     Alert.alert(
@@ -46,7 +105,11 @@ export const Setting: React.FC = () => {
 
 
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <View style={{ flexShrink: 1, paddingRight: 12 }}>
@@ -75,7 +138,7 @@ export const Setting: React.FC = () => {
                   styles.actionButtonFirst,
                   pressed && styles.actionButtonPressed,
                 ]}
-                onPress={handleChangeLogin}
+                onPress={openUsernameModal}
                 accessibilityRole="button"
                 accessibilityLabel="Change login"
               >
@@ -139,11 +202,63 @@ export const Setting: React.FC = () => {
 
           </View>
           <View style={styles.sectionSpacer} />
-          <View style={styles.card}>
-            <SettingProfileInfo palette={palette} layout="inline" />
+          <View
+            style={styles.card}
+            onLayout={event => setProfileInfoOffset(event.nativeEvent.layout.y)}
+          >
+            <SettingProfileInfo
+              palette={palette}
+              layout="inline"
+              initialModal={pendingFocusModal}
+              onInitialModalHandled={() => setPendingFocusModal(null)}
+            />
           </View>
          
         </ScrollView>
+
+        <Modal
+          transparent
+          animationType="fade"
+          visible={usernameModalVisible}
+          onRequestClose={closeUsernameModal}
+        >
+          <View style={styles.usernameModalOverlay}>
+            <View style={[styles.usernameModalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+              <Text style={styles.usernameModalTitle}>Change username</Text>
+              <Text style={styles.usernameModalSubtitle}>Pick a name that represents you in the app.</Text>
+              <TextInput
+                value={usernameInput}
+                onChangeText={setUsernameInput}
+                placeholder="Enter new username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.usernameModalInput, { borderColor: palette.border, color: palette.text }]}
+                placeholderTextColor={palette.subText}
+              />
+              {usernameError ? <Text style={styles.usernameModalError}>{usernameError}</Text> : null}
+              <View style={styles.usernameModalActions}>
+                <Pressable
+                  style={[styles.usernameModalButton, { borderColor: palette.border }]}
+                  onPress={closeUsernameModal}
+                  disabled={isUsernameSaving}
+                >
+                  <Text style={[styles.usernameModalButtonText, { color: palette.text }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.usernameModalButton, styles.usernameModalPrimaryButton]}
+                  onPress={handleSaveUsername}
+                  disabled={isUsernameSaving}
+                >
+                  {isUsernameSaving ? (
+                    <ActivityIndicator color={palette.onPrimary} />
+                  ) : (
+                    <Text style={styles.usernameModalPrimaryText}>Save</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
       </View>
   );
