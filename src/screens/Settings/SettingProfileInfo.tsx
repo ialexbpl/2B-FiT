@@ -16,7 +16,8 @@ import {
   numericMaxLength,
   modalPlaceholders,
   modalTitles,
-  modalDescriptions
+  modalDescriptions,
+  SEX_OPTIONS
 } from '../../models/ProfileModel';
 import { useProfile } from '../../context/ProfileContext';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -31,12 +32,14 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
 }) => {
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
   const {
+    sex,
     age,
     height,
     weight,
     goalWeight,
     activityLevel,
     allergies,
+    setSex,
     setAge,
     setHeight,
     setWeight,
@@ -49,6 +52,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   const [draftTextValue, setDraftTextValue] = useState('');
   const [draftActivity, setDraftActivity] = useState<string | null>(activityLevel);
   const [draftAllergies, setDraftAllergies] = useState<string[]>(allergies);
+  const [draftSex, setDraftSex] = useState<typeof SEX_OPTIONS[number]>(sex);
 
   const neutralBorder = palette.border;
   const neutralBackground = palette.card;
@@ -61,6 +65,14 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
 
   const editCards = useMemo(
     () => [
+      {
+        key: 'sex',
+        type: 'sex' as ModalType,
+        label: 'Sex',
+        value: sex,
+        helper: 'Choose Male or Female',
+        icon: 'male-female-outline',
+      },
       {
         key: 'age',
         type: 'age' as ModalType,
@@ -110,7 +122,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
         icon: 'leaf-outline',
       },
     ],
-    [age, height, weight, goalWeight, selectedActivity, allergies],
+    [sex, age, height, weight, goalWeight, selectedActivity, allergies],
   );
 
   const openModal = (type: ModalType) => {
@@ -130,6 +142,9 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
         break;
       case 'goal':
         setDraftTextValue(goalWeight);
+        break;
+      case 'sex':
+        setDraftSex(sex);
         break;
       case 'activity':
         setDraftActivity(activityLevel ?? ACTIVITY_LEVELS[0]);
@@ -159,6 +174,12 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
 
   const handleModalSave = () => {
     if (!activeModal) {
+      return;
+    }
+
+    if (activeModal === 'sex') {
+      setSex(draftSex);
+      setActiveModal(null);
       return;
     }
 
@@ -203,6 +224,36 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   const renderModalBody = () => {
     if (!activeModal) {
       return null;
+    }
+
+    if (activeModal === 'sex') {
+      return (
+        <View style={styles.optionList}>
+          {SEX_OPTIONS.map(option => {
+            const isSelected = draftSex === option;
+            return (
+              <TouchableOpacity
+                key={option}
+                onPress={() => setDraftSex(option)}
+                style={[
+                  styles.optionButton,
+                  { borderColor: neutralBorder, backgroundColor: neutralBackground },
+                  isSelected && styles.optionButtonSelected
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    { color: isSelected ? '#ffffff' : modalTextColor }
+                  ]}
+                >
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      );
     }
 
     if (activeModal === 'activity') {
