@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,15 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 type SettingProfileInfoProps = ProfileInformationsProps & {
   layout?: 'default' | 'inline';
+  initialModal?: ModalType | null;
+  onInitialModalHandled?: () => void;
 };
 
 export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   palette,
   layout = 'default',
+  initialModal = null,
+  onInitialModalHandled,
 }) => {
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
   const {
@@ -125,7 +129,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     [sex, age, height, weight, goalWeight, selectedActivity, allergies],
   );
 
-  const openModal = (type: ModalType) => {
+  const openModal = useCallback((type: ModalType) => {
     if (!type) {
       return;
     }
@@ -155,7 +159,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     }
 
     setActiveModal(type);
-  };
+  }, [activityLevel, age, allergies, goalWeight, height, sex, weight]);
 
   const handleNumericChange = (value: string, maxLength: number) => {
     const numericValue = value.replace(/[^0-9]/g, '').slice(0, maxLength);
@@ -220,6 +224,13 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
 
     setActiveModal(null);
   };
+
+  useEffect(() => {
+    if (initialModal) {
+      openModal(initialModal);
+      onInitialModalHandled?.();
+    }
+  }, [initialModal, onInitialModalHandled, openModal]);
 
   const renderModalBody = () => {
     if (!activeModal) {

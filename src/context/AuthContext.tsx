@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@utils/supabase';
 import { profileCache } from '@utils/db';
@@ -22,6 +22,7 @@ type AuthValue = {
     profile: ProfileRow | null | undefined;
     isLoading: boolean;
     isLoggedIn: boolean;
+    refreshProfile: () => Promise<void>;
     signInWithIdentifier: (identifier: string, password: string) => Promise<void>;
     signInWithEmail: (email: string, password: string) => Promise<void>;
     signUpWithEmail: (email: string, password: string, username?: string) => Promise<void>;
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthValue>({
     profile: undefined,
     isLoading: true,
     isLoggedIn: false,
+    refreshProfile: async () => { },
     signInWithIdentifier: async () => { },
     signInWithEmail: async () => { },
     signUpWithEmail: async () => { },
@@ -82,41 +84,51 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         })();
         const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
             setSession(s);
-        });
-        return () => {
-            mounted = false;
-            sub.subscription.unsubscribe();
-        };
-    }, []);
+    });
+    return () => {
+        mounted = false;
+        sub.subscription.unsubscribe();
+    };
+}, []);
+
+    const refreshProfile = useCallback(async () => {
+        const userId = session?.user?.id;
+        if (!userId) {
+            setProfile(null);
+            return;
+        }
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        if (error) throw error;
+        setProfile(data ?? null);
+        try {
+            if (data) {
+                await profileCache.upsert({ ...data, id: data.id });
+            }
+        } catch (e) {
+            console.warn('sqlite upsert failed', e);
+        }
+    }, [session?.user?.id]);
 
     useEffect(() => {
-        let mounted = true;
+        let cancelled = false;
         (async () => {
             setIsLoading(true);
-            if (session?.user) {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-                if (error) console.error('profile fetch error', error);
-                if (mounted) setProfile(data ?? null);
-                try {
-                    if (session?.user && data) {
-                        await profileCache.upsert({ ...data, id: data.id });
-                    }
-                } catch (e) {
-                    console.warn('sqlite upsert failed', e);
-                }
-            } else {
-                if (mounted) setProfile(null);
+            try {
+                await refreshProfile();
+            } catch (error) {
+                console.error('profile fetch error', error);
+            } finally {
+                if (!cancelled) setIsLoading(false);
             }
-            setIsLoading(false);
         })();
         return () => {
-            mounted = false;
+            cancelled = true;
         };
-    }, [session?.user?.id]);
+    }, [refreshProfile]);
 
     const signInWithEmail = async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -250,6 +262,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
             profile,
             isLoading,
             isLoggedIn: !!session,
+            refreshProfile,
             signInWithIdentifier,
             signInWithEmail,
             signUpWithEmail,
@@ -258,7 +271,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
             sendPhoneOtp,
             signOut,
         }),
-        [session, profile, isLoading]
+        [session, profile, isLoading, refreshProfile]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
