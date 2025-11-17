@@ -1,138 +1,233 @@
-// community/CommunityFeedSection.tsx
-import React, { useState } from 'react';
-import { View, FlatList } from 'react-native';
+// CommunityFeedSection.tsx - Z OBSŁUGĄ PAGER VIEW
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, FlatList, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
-import type { Post } from './community.types';
+import { usePosts } from '../../../hooks/usePosts';
+import { CreatePostModal } from './CreatePostModal';
 
 type Props = {
   availableHeight: number;
+  onEnablePagerView?: () => void;
 };
 
-export const CommunityFeedSection: React.FC<Props> = ({ availableHeight }) => {
+export const CommunityFeedSection: React.FC<Props> = ({ 
+  availableHeight, 
+  onEnablePagerView 
+}) => {
   const { palette } = useTheme();
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '3',
-      user: {
-        id: 'user2',
-        username: 'fitness_john',
-        isVerified: true,
-      },
-      content: 'New personal record! Deadlift 180kg today. The grind never stops! 🔥',
-      image: 'https://picsum.photos/400/300?random=3',
-      likes: 89,
-      comments: [
-        { id: 'c1', author: 'Mike', text: 'Amazing work! 💪', userId: 'mike', timestamp: new Date().toISOString() },
-        { id: 'c2', author: 'Sarah', text: 'So inspiring!', userId: 'sarah', timestamp: new Date().toISOString() },
-        { id: 'c3', author: 'Tom', text: 'Incredible strength!', userId: 'tom', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-      isLiked: false,
-      type: 'achievement',
-      metrics: {
-        weight: 180,
-      },
-    },
-    {
-      id: '4',
-      user: {
-        id: 'user3',
-        username: 'healthy_eater',
-        isVerified: false,
-      },
-      content: 'Meal prep Sunday! Healthy, delicious, and ready for the week. Who else loves meal prepping?',
-      image: 'https://picsum.photos/400/300?random=4',
-      likes: 45,
-      comments: [
-        { id: 'c4', author: 'Lisa', text: 'Recipe please!', userId: 'lisa', timestamp: new Date().toISOString() },
-        { id: 'c5', author: 'John', text: 'Looks amazing!', userId: 'john', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      isLiked: true,
-      type: 'meal',
-    },
-    {
-      id: '5',
-      user: {
-        id: 'user4',
-        username: 'runner_girl',
-        isVerified: true,
-      },
-      content: 'Morning 10k run with an amazing sunrise view. Nothing beats starting the day with a good run!',
-      image: 'https://picsum.photos/400/300?random=5',
-      likes: 67,
-      comments: [
-        { id: 'c6', author: 'Alex', text: 'Beautiful view!', userId: 'alex', timestamp: new Date().toISOString() },
-        { id: 'c7', author: 'Emma', text: 'Great pace!', userId: 'emma', timestamp: new Date().toISOString() },
-        { id: 'c8', author: 'Ryan', text: 'Motivational!', userId: 'ryan', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-      isLiked: false,
-      type: 'workout',
-      metrics: {
-        distance: 10,
-        duration: 52,
-        calories: 620,
-      },
-    },
-    {
-      id: '6',
-      user: {
-        id: 'user5',
-        username: 'yoga_master',
-        isVerified: false,
-      },
-      content: '30 days of yoga challenge completed! Flexibility and peace of mind achieved. 🧘‍♀️',
-      image: 'https://picsum.photos/400/300?random=6',
-      likes: 102,
-      comments: [
-        { id: 'c9', author: 'David', text: 'Congratulations!', userId: 'david', timestamp: new Date().toISOString() },
-        { id: 'c10', author: 'Sophia', text: 'Inspirational!', userId: 'sophia', timestamp: new Date().toISOString() },
-        { id: 'c11', author: 'Liam', text: 'Well done!', userId: 'liam', timestamp: new Date().toISOString() },
-        { id: 'c12', author: 'Olivia', text: 'Amazing progress!', userId: 'olivia', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      isLiked: false,
-      type: 'progress',
-    },
-  ]);
+  const { posts, loading, refreshing, likePost, refetch } = usePosts();
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const flatListRef = useRef<FlatList>(null);
 
-  const handleLike = (postId: string) => {
-    setPosts(currentPosts =>
-      currentPosts.map(post =>
-        post.id === postId
-          ? {
-              ...post,
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-            }
-          : post
-      )
-    );
-  };
+  // Auto-refresh po zamknięciu modala
+  useEffect(() => {
+    if (!createModalVisible) {
+      refetch();
+      setLastRefresh(new Date());
+    }
+  }, [createModalVisible]);
+
+  // Włącz pager view gdy dotrzemy do początku listy
+  const handleScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    
+    // Jeśli jesteśmy na samej górze listy, włącz pager view
+    if (offsetY <= 0 && onEnablePagerView) {
+      onEnablePagerView();
+    }
+  }, [onEnablePagerView]);
+
+  const convertToLegacyPost = (post: any) => ({
+    id: post.id,
+    user: {
+      id: post.user?.id || post.user_id || 'unknown',
+      username: post.user?.username || post.user?.full_name || 'Unknown User',
+      isVerified: false,
+    },
+    content: post.content,
+    image: post.image_url,
+    likes: post.likes_count || 0,
+    comments: [],
+    timestamp: post.created_at,
+    isLiked: post.is_liked || false,
+    type: post.post_type,
+    metrics: {
+      calories: post.calories || undefined,
+      duration: post.duration || undefined,
+      distance: post.distance || undefined,
+      weight: post.weight || undefined,
+    },
+  });
 
   const handleComment = (postId: string) => {
     console.log('Open comments for post:', postId);
   };
 
-  return (
-    <View style={{ 
-      flex: 1, 
+  const handleRefresh = async () => {
+    await refetch();
+    setLastRefresh(new Date());
+  };
+
+  const getTimeSinceLastRefresh = () => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - lastRefresh.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s ago`;
+    } else {
+      return `${Math.floor(diffInSeconds / 60)}m ago`;
+    }
+  };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
       backgroundColor: palette.background,
-      height: availableHeight 
-    }}>
+    },
+    refreshHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: palette.card100,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    refreshText: {
+      fontSize: 12,
+      color: palette.subText,
+    },
+    refreshButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.primary + '20',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    refreshButtonText: {
+      fontSize: 12,
+      color: palette.primary,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
+    fab: {
+      position: 'absolute',
+      right: 16,
+      bottom: 16,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: palette.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      zIndex: 1000,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: availableHeight,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: palette.subText,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      height: availableHeight,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: palette.subText,
+      textAlign: 'center',
+      marginTop: 12,
+      lineHeight: 22,
+    },
+  });
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="refresh" size={32} color={palette.subText} />
+        <Text style={styles.loadingText}>Loading posts...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent
-            post={item}
-            onLike={handleLike}
+            post={convertToLegacyPost(item)}
+            onLike={() => likePost(item.id)}
             onComment={handleComment}
           />
         )}
-        showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        ListHeaderComponent={
+          <View style={styles.refreshHeader}>
+            <Text style={styles.refreshText}>
+              Last refresh: {getTimeSinceLastRefresh()}
+            </Text>
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+            >
+              <Ionicons name="refresh" size={14} color={palette.primary} />
+              <Text style={styles.refreshButtonText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={48} color={palette.subText} />
+            <Text style={styles.emptyText}>
+              No posts yet.{'\n'}Be the first to share your fitness journey!
+            </Text>
+            <TouchableOpacity 
+              style={[styles.fab, { position: 'relative', marginTop: 20 }]}
+              onPress={() => setCreateModalVisible(true)}
+            >
+              <Ionicons name="add" size={24} color={palette.onPrimary} />
+            </TouchableOpacity>
+          </View>
+        }
+        showsVerticalScrollIndicator={true}
+      />
+
+      {/* Floating Action Button */}
+      {posts.length > 0 && (
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={() => setCreateModalVisible(true)}
+        >
+          <Ionicons name="add" size={24} color={palette.onPrimary} />
+        </TouchableOpacity>
+      )}
+
+      <CreatePostModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
       />
     </View>
   );
