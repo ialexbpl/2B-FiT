@@ -1,6 +1,6 @@
-// UserPostsSection.tsx - ZAKTUALIZOWANA WERSJA
+// UserPostsSection.tsx - user feed with profile header
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
@@ -15,47 +15,37 @@ type Props = {
 
 export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const { palette } = useTheme();
-  const { posts, loading, refreshing, likePost, refetch } = usePosts();
+  const { posts, loading, refreshing, likePost, deletePost, refetch } = usePosts();
   const { profile, session } = useAuth();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  // Filtruj tylko posty bieżącego użytkownika
   const userPosts = useMemo(() => {
-    console.log('🔍 Filtering user posts...');
     const filtered = posts.filter(post => post.user_id === session?.user?.id);
-    console.log(`✅ Found ${filtered.length} user posts`);
     return filtered;
   }, [posts, session?.user?.id]);
 
-  // Auto-refresh po zamknięciu modala
   useEffect(() => {
     if (!createModalVisible) {
-      console.log('🔄 Auto-refreshing after modal close');
       refetch();
       setLastRefresh(new Date());
     }
   }, [createModalVisible]);
 
-  // Formatowanie czasu od ostatniego odświeżenia
   const getTimeSinceLastRefresh = () => {
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - lastRefresh.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return `${diffInSeconds}s ago`;
-    } else if (diffInSeconds < 3600) {
-      return `${Math.floor(diffInSeconds / 60)}m ago`;
-    } else {
-      return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    }
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    return `${Math.floor(diffInSeconds / 3600)}h ago`;
   };
 
   const convertToLegacyPost = (post: any) => ({
     id: post.id,
     user: {
-      id: post.user?.id || post.user_id || 'unknown',
-      username: post.user?.username || post.user?.full_name || 'You',
+      id: post.user?.id || post.user_id || session?.user?.id || 'unknown',
+      username: post.user?.full_name || post.user?.username || profile?.full_name || profile?.username || 'You',
+      avatar: post.user?.avatar_url || profile?.avatar_url,
       isVerified: false,
     },
     content: post.content,
@@ -79,138 +69,89 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     following: 156,
   };
 
-  const handleComment = (postId: string) => {
-    console.log('Open comments for post:', postId);
-  };
+  const handleComment = (postId: string) => {};
 
   const handleRefresh = async () => {
-    console.log('🔄 Manual refresh started');
     await refetch();
     setLastRefresh(new Date());
   };
 
+  const avatarNode = profile?.avatar_url ? (
+    <Image
+      source={{ uri: profile.avatar_url }}
+      style={{ width: 96, height: 96, borderRadius: 48 }}
+    />
+  ) : (
+    <Ionicons name="person" size={48} color={palette.subText} />
+  );
+
+  const displayName = profile?.full_name || profile?.username || 'Your Profile';
+  const displayHandle = profile?.username ? `@${profile.username}` : 'Set up your username';
+
   const styles = useMemo(() => StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: palette.background,
-    },
+    container: { flex: 1, backgroundColor: palette.background },
     profileHeader: {
       backgroundColor: palette.card100,
       padding: 20,
       borderBottomWidth: 1,
       borderBottomColor: palette.border,
     },
-    profileInfo: {
-      alignItems: 'center' as const,
-      marginBottom: 20,
-    },
+    profileInfo: { alignItems: 'center', marginBottom: 20 },
     avatar: {
       width: 96,
       height: 96,
       borderRadius: 48,
       backgroundColor: palette.border,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
+      justifyContent: 'center',
+      alignItems: 'center',
       marginBottom: 12,
       borderWidth: 3,
       borderColor: palette.primary,
+      overflow: 'hidden',
     },
-    username: {
-      fontSize: 20,
-      fontWeight: '700' as const,
-      color: palette.text,
-      marginBottom: 6,
-    },
-    bio: {
-      fontSize: 14,
-      color: palette.subText,
-      textAlign: 'center' as const,
-      lineHeight: 20,
-    },
+    username: { fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: 6 },
+    bio: { fontSize: 14, color: palette.subText, textAlign: 'center', lineHeight: 20 },
     statsContainer: {
-      flexDirection: 'row' as const,
-      justifyContent: 'space-around' as const,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
       marginBottom: 20,
       paddingHorizontal: 20,
     },
-    statItem: {
-      alignItems: 'center' as const,
-    },
-    statNumber: {
-      fontSize: 18,
-      fontWeight: '700' as const,
-      color: palette.text,
-    },
-    statLabel: {
-      fontSize: 12,
-      color: palette.subText,
-      marginTop: 4,
-    },
+    statItem: { alignItems: 'center' },
+    statNumber: { fontSize: 18, fontWeight: '700', color: palette.text },
+    statLabel: { fontSize: 12, color: palette.subText, marginTop: 4 },
     createButton: {
       backgroundColor: palette.primary,
       paddingHorizontal: 32,
       paddingVertical: 12,
-      borderRadius: 20,
-      alignSelf: 'center' as const,
+      borderRadius: 24,
+      alignSelf: 'center',
       marginBottom: 12,
     },
-    createButtonText: {
-      color: palette.onPrimary,
-      fontSize: 14,
-      fontWeight: '600' as const,
-    },
+    createButtonText: { color: palette.onPrimary, fontWeight: '700' },
     refreshInfo: {
-      flexDirection: 'row' as const,
+      flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
-      paddingHorizontal: 16,
     },
-    refreshText: {
-      fontSize: 12,
-      color: palette.subText,
-    },
+    refreshText: { color: palette.subText, fontSize: 12 },
     refreshButton: {
-      backgroundColor: palette.primary + '20',
-      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
       paddingVertical: 8,
+      backgroundColor: palette.card,
       borderRadius: 12,
-      flexDirection: 'row' as const,
-      alignItems: 'center',
     },
-    refreshButtonText: {
-      color: palette.primary,
-      fontSize: 12,
-      fontWeight: '600',
-      marginLeft: 6,
-    },
+    refreshButtonText: { color: palette.primary, marginLeft: 6, fontWeight: '600' },
     emptyState: {
-      flex: 1,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-      padding: 40,
-      backgroundColor: palette.card100,
-      margin: 16,
-      borderRadius: 16,
-    },
-    emptyStateText: {
-      fontSize: 16,
-      color: palette.subText,
-      textAlign: 'center' as const,
-      marginTop: 16,
-      lineHeight: 22,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
       alignItems: 'center',
-      height: availableHeight,
+      padding: 24,
+      gap: 12,
     },
-    loadingText: {
-      marginTop: 12,
-      fontSize: 16,
-      color: palette.subText,
-    },
+    emptyStateText: { fontSize: 16, color: palette.subText, textAlign: 'center', lineHeight: 22 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', height: availableHeight },
+    loadingText: { marginTop: 12, fontSize: 16, color: palette.subText },
   }), [palette, availableHeight]);
 
   if (loading && !refreshing) {
@@ -232,22 +173,20 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
             post={convertToLegacyPost(item)}
             onLike={() => likePost(item.id)}
             onComment={handleComment}
+            onDelete={() => deletePost(item.id)}
           />
         )}
         refreshing={refreshing}
         onRefresh={handleRefresh}
-        nestedScrollEnabled={true}
+        nestedScrollEnabled
         style={{ flex: 1 }}
         ListHeaderComponent={
           <View style={styles.profileHeader}>
             <View style={styles.profileInfo}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={48} color={palette.subText} />
-              </View>
-              <Text style={styles.username}>{profile?.username || profile?.full_name || 'Your Profile'}</Text>
+              <View style={styles.avatar}>{avatarNode}</View>
+              <Text style={styles.username}>{displayName}</Text>
               <Text style={styles.bio}>
-                {profile?.username ? `@${profile.username} • ` : ''}
-                Fitness enthusiast • Healthy lifestyle • Progress over perfection
+                {displayHandle} • Fitness enthusiast • Healthy lifestyle • Progress over perfection
               </Text>
             </View>
             
@@ -273,7 +212,6 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
               <Text style={styles.createButtonText}>Create Post</Text>
             </TouchableOpacity>
 
-            {/* Info o odświeżaniu */}
             <View style={styles.refreshInfo}>
               <Text style={styles.refreshText}>
                 Last refresh: {getTimeSinceLastRefresh()}

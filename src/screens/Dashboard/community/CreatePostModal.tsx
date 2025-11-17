@@ -25,6 +25,7 @@ type CreatePostModalProps = {
 };
 
 type PostType = 'workout' | 'meal' | 'progress' | 'achievement';
+const DEFAULT_POST_TYPE: PostType = 'progress';
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClose }) => {
   const { palette } = useTheme();
@@ -33,7 +34,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
   
   const [content, setContent] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [postType, setPostType] = useState<PostType>('workout');
   const [metrics, setMetrics] = useState({
     calories: undefined as number | undefined,
     duration: undefined as number | undefined,
@@ -81,13 +81,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
       const fileExt = filename.split('.').pop()?.toLowerCase() || 'jpg';
       const filePath = `post-images/${Date.now()}.${fileExt}`;
 
-      const formData = new FormData();
+     const formData = new FormData();
       formData.append('file', {
         uri: uri,
         name: filename,
         type: `image/${fileExt}`,
       } as any);
-
       const { data, error } = await supabase.storage
         .from('posts')
         .upload(filePath, formData, {
@@ -163,7 +162,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
       await createPost({
         content: content.trim(),
         image_url: imageUrl,
-        post_type: postType,
+        post_type: DEFAULT_POST_TYPE,
         calories: metrics.calories,
         duration: metrics.duration,
         distance: metrics.distance,
@@ -184,7 +183,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
   const resetForm = () => {
     setContent('');
     setSelectedImage(null);
-    setPostType('workout');
     setMetrics({ 
       calories: undefined, 
       duration: undefined, 
@@ -376,13 +374,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
     },
   });
 
-  const postTypes: { type: PostType; label: string; icon: string }[] = [
-    { type: 'workout', label: 'Workout', icon: 'fitness' },
-    { type: 'meal', label: 'Meal', icon: 'restaurant' },
-    { type: 'progress', label: 'Progress', icon: 'trending-up' },
-    { type: 'achievement', label: 'Achievement', icon: 'trophy' },
-  ];
-
   return (
     <Modal
       visible={visible}
@@ -441,39 +432,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
                   <Text style={{ color: palette.text, marginLeft: 8 }}>Add Image</Text>
                 </TouchableOpacity>
               )}
-            </View>
-
-            {/* Post Type Selection */}
-            <View style={styles.typeContainer}>
-              {postTypes.map(({ type, label, icon }) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.typeButton,
-                    { 
-                      backgroundColor: postType === type ? palette.primary : palette.background,
-                      borderColor: postType === type ? palette.primary : palette.border,
-                    }
-                  ]}
-                  onPress={() => setPostType(type)}
-                >
-                  <Ionicons 
-                    name={icon as any} 
-                    size={16} 
-                    color={postType === type ? palette.onPrimary : palette.text} 
-                  />
-                  <Text 
-                    style={{ 
-                      fontSize: 12, 
-                      marginTop: 4,
-                      color: postType === type ? palette.onPrimary : palette.text,
-                      fontWeight: postType === type ? '600' : '400',
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
             </View>
 
             {/* Metrics Inputs with Confirmation */}

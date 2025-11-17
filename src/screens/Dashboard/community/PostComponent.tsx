@@ -9,9 +9,10 @@ type PostComponentProps = {
   post: Post;
   onLike: (postId: string) => void;
   onComment: (postId: string) => void;
+  onDelete?: (postId: string) => void;
 };
 
-export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment }) => {
+export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment, onDelete }) => {
   const { palette } = useTheme();
 
   const formatTimestamp = (timestamp: string) => {
@@ -126,22 +127,19 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
     },
     metricValue: {
       fontSize: 14,
-      fontWeight: '700' as const,
+      fontWeight: '600' as const,
       color: palette.text,
     },
     actionsContainer: {
       flexDirection: 'row' as const,
-      justifyContent: 'space-around' as const,
-      paddingVertical: 12,
+      alignItems: 'center' as const,
       paddingHorizontal: 16,
-      borderTopWidth: 1,
-      borderTopColor: palette.border,
+      paddingVertical: 12,
+      gap: 16,
     },
     actionButton: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
-      flex: 1,
-      justifyContent: 'center' as const,
     },
     actionText: {
       marginLeft: 6,
@@ -155,7 +153,11 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
       {/* Post Header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={20} color={palette.subText} />
+          {post.user.avatar ? (
+            <Image source={{ uri: post.user.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+          ) : (
+            <Ionicons name="person" size={20} color={palette.subText} />
+          )}
         </View>
         
         <View style={styles.userInfo}>
@@ -262,12 +264,24 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="share-outline" size={22} color={palette.text} />
-          <Text style={[styles.actionText, { color: palette.text }]}>
-            Share
-          </Text>
-        </TouchableOpacity>
+        {onDelete ? (
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => onDelete(post.id)}
+          >
+            <Ionicons name="trash-outline" size={22} color={palette.text} />
+            <Text style={[styles.actionText, { color: palette.text }]}>
+              Delete
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="share-outline" size={22} color={palette.text} />
+            <Text style={[styles.actionText, { color: palette.text }]}>
+              Share
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

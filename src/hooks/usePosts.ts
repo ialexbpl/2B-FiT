@@ -1,5 +1,5 @@
 // src/hooks/usePosts.ts
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@utils/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,9 +30,9 @@ export const usePosts = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { session } = useAuth();
-  const refreshIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null); // ✅ POPRAWIONE
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       console.log('🔄 Fetching posts...');
       
@@ -43,30 +43,35 @@ export const usePosts = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          user:profiles!user_id (
-            id,
-            username,
-            full_name,
-            avatar_url
-          ),
-          post_likes!left (
-            user_id
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const [postsRes, likedRes] = await Promise.all([
+        supabase
+          .from('posts')
+          .select(`
+            *,
+            user:profiles!user_id (
+              id,
+              username,
+              full_name,
+              avatar_url
+            )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', session.user.id)
+      ]);
 
-      if (error) throw error;
+      if (postsRes.error) throw postsRes.error;
+      if (likedRes.error) throw likedRes.error;
 
-      const postsWithLikes = data?.map(post => ({
+      const likedSet = new Set((likedRes.data || []).map((like: any) => like.post_id));
+      const postsWithLikes = (postsRes.data || []).map(post => ({
         ...post,
-        is_liked: post.post_likes?.some((like: any) => like.user_id === session?.user?.id) || false
-      })) || [];
+        is_liked: likedSet.has(post.id)
+      }));
 
-      console.log(`✅ Loaded ${postsWithLikes.length} posts`);
+      console.log(`�o. Loaded ${postsWithLikes.length} posts`);
       setPosts(postsWithLikes);
     } catch (error) {
       console.error('Error fetching posts:', error);
@@ -74,12 +79,12 @@ export const usePosts = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [session?.user?.id]);
 
   const createPost = async (postData: {
     content: string;
     image_url?: string;
-    post_type: 'workout' | 'meal' | 'progress' | 'achievement';
+    post_type: Post['post_type'];
     calories?: number;
     duration?: number;
     distance?: number;
@@ -88,7 +93,7 @@ export const usePosts = () => {
     if (!session?.user) throw new Error('User must be logged in to create post');
 
     try {
-      console.log('🚀 Creating post for user:', session.user.id);
+      console.log('�Ys? Creating post for user:', session.user.id);
       
       const { data, error } = await supabase
         .from('posts')
@@ -104,9 +109,9 @@ export const usePosts = () => {
       if (error) throw error;
       if (!data) throw new Error('No data returned from post creation');
 
-      console.log('✅ Post created successfully:', data);
+      console.log('�o. Post created successfully:', data);
 
-      // Po INSERT załaduj pełne dane z JOINem
+      // Re-fetch with joined profile data for UI
       const { data: fullPostData } = await supabase
         .from('posts')
         .select(`
@@ -185,30 +190,29 @@ export const usePosts = () => {
     }
   };
 
-  // ✅ AUTO-REFRESH CO 30 SEKUND
-  const startAutoRefresh = () => {
-    // Czyścimy poprzedni interval
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
+  const deletePost = async (postId: string) => {
+    if (!session?.user?.id) {
+      console.log('Cannot delete post - no user session');
+      return;
     }
-    
-    // Ustawiamy nowy interval - odświeżaj co 30 sekund
-    refreshIntervalRef.current = setTimeout(() => {
-      console.log('🔄 Auto-refreshing posts...');
-      fetchPosts();
-      // Ustawiamy kolejny interval po wykonaniu
-      startAutoRefresh();
-    }, 30000); // 30 sekund
+
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      setPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      throw error;
+    }
   };
 
-  const stopAutoRefresh = () => {
-    if (refreshIntervalRef.current) {
-      clearTimeout(refreshIntervalRef.current);
-      refreshIntervalRef.current = null;
-    }
-  };
-
-  // Ręczne odświeżanie
+  // Manual refresh
   const manualRefresh = async () => {
     setRefreshing(true);
     await fetchPosts();
@@ -216,13 +220,14 @@ export const usePosts = () => {
 
   useEffect(() => {
     fetchPosts();
-    startAutoRefresh();
+    const intervalId = setInterval(() => {
+      console.log('LOL Auto-refreshing posts...');
+      fetchPosts();
+    }, 30000);
+    refreshIntervalRef.current = intervalId;
 
-    // Cleanup przy odmontowaniu komponentu
-    return () => {
-      stopAutoRefresh();
-    };
-  }, [session?.user?.id]);
+    return () => clearInterval(intervalId);
+  }, [fetchPosts]);
 
   return {
     posts,
@@ -230,8 +235,15 @@ export const usePosts = () => {
     refreshing,
     createPost,
     likePost,
+    deletePost,
     refetch: manualRefresh, // Ręczne odświeżanie
-    startAutoRefresh,
-    stopAutoRefresh,
+    // interval-based auto-refresh; keep API surface for compatibility
+    startAutoRefresh: () => {},
+    stopAutoRefresh: () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    },
   };
 };
