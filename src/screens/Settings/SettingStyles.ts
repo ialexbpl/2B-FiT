@@ -100,6 +100,70 @@ export const makeSettingStyles = (palette: Palette) =>
     sectionSpacer: {
       height: 12,
     },
+    usernameModalOverlay: {
+      flex: 1,
+      backgroundColor: palette.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    usernameModalCard: {
+      width: '100%',
+      maxWidth: 360,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      padding: 20,
+    },
+    usernameModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: palette.text,
+      marginBottom: 8,
+    },
+    usernameModalSubtitle: {
+      fontSize: 14,
+      color: palette.subText,
+      marginBottom: 16,
+    },
+    usernameModalInput: {
+      borderWidth: 1,
+      borderRadius: theme.radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+    },
+    usernameModalError: {
+      color: theme.colors.danger,
+      fontSize: 13,
+      marginTop: 8,
+    },
+    usernameModalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 20,
+    },
+    usernameModalButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: theme.radius.sm,
+      borderWidth: 1,
+      marginLeft: 12,
+      minWidth: 96,
+      alignItems: 'center',
+    },
+    usernameModalButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    usernameModalPrimaryButton: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    usernameModalPrimaryText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: palette.onPrimary,
+    },
   });
 
 export default makeSettingStyles;

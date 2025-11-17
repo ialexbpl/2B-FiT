@@ -1,9 +1,9 @@
 // src/screens/Dashboard/FoodIntake.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { Palette } from '@styles/theme';
 import type { Styles } from './DashboardStyles';
+import { useNutritionTargets } from '@hooks/useNutritionTargets';
 
 type Props = {
     styles: Styles;
@@ -11,15 +11,24 @@ type Props = {
 };
 
 export const FoodIntake: React.FC<Props> = ({ styles, palette }) => {
-    const foodData = {
-        consumed: 1850,
-        goal: 2200,
-        protein: 120,
-        carbs: 210,
-        fat: 65,
-    };
+    const targets = useNutritionTargets();
 
-    const progress = foodData.consumed / foodData.goal;
+    // Placeholder consumed values (0) until intake tracking is implemented.
+    // The goal + macro values come from the nutrition calculator.
+    const consumedKcal = 0;
+    const goalKcal = targets.calories || 0;
+
+    const foodData = useMemo(() => ({
+        consumed: consumedKcal,
+        goal: goalKcal,
+        protein: targets.protein_g || 0,
+        carbs: targets.carbs_g || 0,
+        fat: targets.fat_g || 0,
+    }), [consumedKcal, goalKcal, targets.protein_g, targets.carbs_g, targets.fat_g]);
+
+    const progress = foodData.goal > 0 ? Math.min(1, Math.max(0, foodData.consumed / foodData.goal)) : 0;
+    const remaining = Math.max(0, foodData.goal - foodData.consumed);
+    const percentText = foodData.goal > 0 ? `${Math.round(progress * 100)}%` : '0%';
 
     return (
         <View style={[styles.card, styles.largeCard]}>
@@ -29,34 +38,68 @@ export const FoodIntake: React.FC<Props> = ({ styles, palette }) => {
                     <Text style={styles.cardSubtitle}>Today's nutrition</Text>
                 </View>
 
-                {/* Calories progress */}
+                {/* Calories progress circle (fills as you reach goal) */}
                 <View style={{ alignItems: 'center' }}>
                     <View style={{
-                        width: 50,
-                        height: 50,
-                        borderRadius: 25,
-                        borderWidth: 3,
-                        borderColor: palette.border,
+                        width: 72,
+                        height: 72,
                         justifyContent: 'center',
                         alignItems: 'center',
                         marginBottom: 4,
                     }}>
+                        {/* Track */}
                         <View style={{
                             position: 'absolute',
-                            width: 50,
-                            height: 50,
-                            borderRadius: 25,
-                            borderWidth: 3,
-                            borderColor: progress < 1 ? palette.primary : '#FF6B6B',
-                            borderLeftColor: 'transparent',
-                            borderBottomColor: 'transparent',
-                            transform: [{ rotate: `${progress * 360 - 135}deg` }],
+                            width: 72,
+                            height: 72,
+                            borderRadius: 36,
+                            borderWidth: 6,
+                            borderColor: palette.border,
                         }} />
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: palette.text }}>
+                        {/* Progress arcs: right half always, left half only if >50% */}
+                        {(() => {
+                          if (progress <= 0) return null;
+                          const overHalf = progress > 0.5;
+                          const progressColor = progress < 1 ? palette.primary : '#FF6B6B';
+                          const rightRotation = progress <= 0.5 ? -135 + progress * 360 : 45;
+                          const leftRotation = overHalf ? -135 + (progress - 0.5) * 360 : -135;
+                          return (
+                            <>
+                              <View style={{
+                                position: 'absolute',
+                                width: 72,
+                                height: 72,
+                                borderRadius: 36,
+                                borderWidth: 6,
+                                borderColor: progressColor,
+                                borderLeftColor: 'transparent',
+                                borderBottomColor: 'transparent',
+                                transform: [{ rotate: `${rightRotation}deg` }],
+                              }} />
+                              {overHalf && (
+                                <View style={{
+                                  position: 'absolute',
+                                  width: 72,
+                                  height: 72,
+                                  borderRadius: 36,
+                                  borderWidth: 6,
+                                  borderColor: progressColor,
+                                  borderLeftColor: 'transparent',
+                                  borderBottomColor: 'transparent',
+                                  transform: [{ rotate: `${leftRotation}deg` }],
+                                }} />
+                              )}
+                            </>
+                          );
+                        })()}
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: palette.text, textAlign: 'center' }}>
                             {foodData.consumed}
                         </Text>
+                        <Text style={{ fontSize: 10, color: palette.subText, marginTop: -2 }}>
+                            / {foodData.goal}
+                        </Text>
                     </View>
-                    <Text style={{ fontSize: 10, color: palette.subText }}>kcal</Text>
+                    <Text style={{ fontSize: 10, color: palette.subText }}>{percentText}</Text>
                 </View>
             </View>
 
