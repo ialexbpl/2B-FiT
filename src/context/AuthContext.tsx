@@ -13,6 +13,7 @@ type ProfileRow = {
     username: string | null;
     full_name: string | null;
     avatar_url: string | null;
+    website: string | null;
     updated_at: string | null;
 };
 
@@ -65,56 +66,6 @@ const resolveRedirectUrl = () => {
     });
 };
 
-// FUNKCJA NAPRAWAJĄCA BRAKUJĄCE PROFILE
-const ensureProfileExists = async (userId: string): Promise<ProfileRow | null> => {
-    try {
-        // Najpierw sprawdź czy profil istnieje
-        const { data: existingProfile, error: checkError } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url, updated_at')
-            .eq('id', userId)
-            .single();
-
-        // Jeśli profil istnieje - zwróć go
-        if (existingProfile) {
-            return existingProfile;
-        }
-
-        // Jeśli brak profilu (błąd PGRST116) - stwórz nowy
-        if (checkError && checkError.code === 'PGRST116') {
-            console.log('Creating missing profile for user:', userId);
-            
-            const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert([
-                    { 
-                        id: userId, 
-                        username: `user_${userId.slice(0, 8)}`,
-                        full_name: 'User',
-                        avatar_url: null
-                    }
-                ])
-                .select('id, username, full_name, avatar_url, updated_at')
-                .single();
-
-            if (createError) {
-                console.error('Error creating profile:', createError);
-                return null;
-            }
-
-            console.log('Profile created successfully');
-            return newProfile;
-        }
-
-        // Inny błąd
-        console.error('Error checking profile:', checkError);
-        return null;
-    } catch (error) {
-        console.error('Error in ensureProfileExists:', error);
-        return null;
-    }
-};
-
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     const [session, setSession] = useState<Session | null | undefined>(undefined);
     const [profile, setProfile] = useState<ProfileRow | null | undefined>(undefined);
@@ -131,7 +82,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
                 setIsLoading(false);
             }
         })();
-        
         const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
             setSession(s);
     });
@@ -141,12 +91,55 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     };
 }, []);
 
+    // Ensure a profile row exists for the current auth user (useful for OAuth like Google)
+    const ensureProfile = useCallback(
+        async (u: Session['user']) => {
+            if (!u?.id) return;
+            const { data, error } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle();
+            if (error) {
+                console.error('ensureProfile select error', error);
+                return;
+            }
+            if (data) return; // already exists
+
+            const username =
+                (u.user_metadata as any)?.username ||
+                (u.user_metadata as any)?.preferred_username ||
+                (u.user_metadata as any)?.name ||
+                (u.email ? u.email.split('@')[0] : `user_${u.id.slice(0, 8)}`);
+
+            const full_name =
+                (u.user_metadata as any)?.name ||
+                (u.user_metadata as any)?.full_name ||
+                u.email ||
+                username;
+
+            const avatar_url =
+                (u.user_metadata as any)?.picture ||
+                (u.user_metadata as any)?.avatar_url ||
+                null;
+
+            const { error: insertErr } = await supabase.from('profiles').insert({
+                id: u.id,
+                username,
+                full_name,
+                avatar_url,
+            });
+            if (insertErr) {
+                console.error('ensureProfile insert error', insertErr);
+            }
+        },
+        []
+    );
+
     const refreshProfile = useCallback(async () => {
         const userId = session?.user?.id;
         if (!userId) {
             setProfile(null);
             return;
         }
+        // Make sure a profile row exists (handles Google/OAuth users without a profile)
+        await ensureProfile(session.user);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -161,7 +154,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         } catch (e) {
             console.warn('sqlite upsert failed', e);
         }
-    }, [session?.user?.id]);
+    }, [session?.user?.id, ensureProfile]);
 
     useEffect(() => {
         let cancelled = false;
@@ -190,22 +183,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         if (trimmed.includes('@')) {
             return signInWithEmail(trimmed, password);
         }
-        
-        // Dla username - znajdź email w profilu
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('username', trimmed)
-            .maybeSingle();
-            
-        if (error) throw error;
-        if (!data) {
-            throw new Error('Username not found');
-        }
-        
-        // Użyj bezpośrednio signInWithEmail z domyślnym emailem
-        // (lub zmień logikę w zależności od struktury Twojej bazy)
-        throw new Error('Please sign in with your email address');
+        throw new Error('Sign in with email is required (profiles table has no email column).');
     };
 
     const signUpWithEmail = async (email: string, password: string, username?: string) => {
@@ -215,9 +193,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
             options: username ? { data: { username } } : undefined,
         });
         if (error) throw error;
-        
-        // Profil zostanie stworzony automatycznie przez trigger w bazie
-        // lub przez ensureProfileExists
+        const newSession = data?.session ?? (await supabase.auth.getSession()).data.session;
+        if (username && newSession?.user?.id) {
+            await supabase.from('profiles').update({ username }).eq('id', newSession.user.id);
+        }
     };
 
     const signOut = async () => {
@@ -246,7 +225,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         if (error) throw error;
 
         if (!data?.url) {
-            throw new Error('OAuth URL not returned');
+            throw new Error('OAuth URL not returned. Check provider configuration.');
         }
 
         if (Platform.OS === 'web') {
@@ -256,12 +235,34 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
         const authResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (authResult.type === 'success' && authResult.url) {
-            const url = new URL(authResult.url);
-            const params = new URLSearchParams(url.hash.slice(1));
-            
-            const accessToken = params.get('access_token');
-            const refreshToken = params.get('refresh_token');
-            
+            const params: Record<string, string> = {};
+            const collect = (raw: string | undefined) => {
+                if (!raw) return;
+                raw.split('&').forEach((pair) => {
+                    if (!pair) return;
+                    const [rawKey, rawValue = ''] = pair.split('=');
+                    if (!rawKey) return;
+                    const key = decodeURIComponent(rawKey);
+                    if (key in params) return;
+                    params[key] = decodeURIComponent(rawValue);
+                });
+            };
+
+            const queryIndex = authResult.url.indexOf('?');
+            if (queryIndex >= 0) {
+                const hashIndex = authResult.url.indexOf('#', queryIndex);
+                collect(authResult.url.slice(
+                    queryIndex + 1,
+                    hashIndex >= 0 ? hashIndex : undefined
+                ));
+            }
+            const hashIndex = authResult.url.indexOf('#');
+            if (hashIndex >= 0) {
+                collect(authResult.url.slice(hashIndex + 1));
+            }
+
+            const accessToken = params['access_token'];
+            const refreshToken = params['refresh_token'];
             if (accessToken && refreshToken) {
                 const { error: sessionError } = await supabase.auth.setSession({
                     access_token: accessToken,
@@ -269,12 +270,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
                 });
                 if (sessionError) throw sessionError;
             } else {
-                throw new Error('OAuth redirect missing tokens');
+                const authCode = params['code'];
+                if (!authCode) {
+                    throw new Error('OAuth redirect missing tokens. Check Supabase configuration.');
+                }
+                const { error: sessionError } = await supabase.auth.exchangeCodeForSession(authCode);
+                if (sessionError) throw sessionError;
             }
         } else if (authResult.type === 'cancel' || authResult.type === 'dismiss') {
             return;
-        } else {
-            throw new Error('Authentication failed');
+        } else if (authResult.type === 'locked') {
+            throw new Error('Authentication session locked. Try again.');
         }
     };
 

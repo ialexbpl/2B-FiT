@@ -1,11 +1,12 @@
 // CommunityFeedSection.tsx - Z OBSŁUGĄ PAGER VIEW
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
 import { usePosts } from '../../../hooks/usePosts';
 import { CreatePostModal } from './CreatePostModal';
+import { useAuth } from '@context/AuthContext';
 
 type Props = {
   availableHeight: number;
@@ -17,12 +18,12 @@ export const CommunityFeedSection: React.FC<Props> = ({
   onEnablePagerView 
 }) => {
   const { palette } = useTheme();
+  const { profile } = useAuth();
   const { posts, loading, refreshing, likePost, refetch } = usePosts();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const flatListRef = useRef<FlatList>(null);
 
-  // Auto-refresh po zamknięciu modala
   useEffect(() => {
     if (!createModalVisible) {
       refetch();
@@ -30,11 +31,8 @@ export const CommunityFeedSection: React.FC<Props> = ({
     }
   }, [createModalVisible]);
 
-  // Włącz pager view gdy dotrzemy do początku listy
   const handleScroll = useCallback((event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
-    
-    // Jeśli jesteśmy na samej górze listy, włącz pager view
     if (offsetY <= 0 && onEnablePagerView) {
       onEnablePagerView();
     }
@@ -44,7 +42,8 @@ export const CommunityFeedSection: React.FC<Props> = ({
     id: post.id,
     user: {
       id: post.user?.id || post.user_id || 'unknown',
-      username: post.user?.username || post.user?.full_name || 'Unknown User',
+      username: post.user?.full_name || post.user?.username || 'Unknown User',
+      avatar: post.user?.avatar_url,
       isVerified: false,
     },
     content: post.content,
@@ -62,9 +61,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
     },
   });
 
-  const handleComment = (postId: string) => {
-    console.log('Open comments for post:', postId);
-  };
+  const handleComment = (postId: string) => {};
 
   const handleRefresh = async () => {
     await refetch();
@@ -215,7 +212,6 @@ export const CommunityFeedSection: React.FC<Props> = ({
         showsVerticalScrollIndicator={true}
       />
 
-      {/* Floating Action Button */}
       {posts.length > 0 && (
         <TouchableOpacity 
           style={styles.fab}

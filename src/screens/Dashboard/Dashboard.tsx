@@ -1,4 +1,4 @@
-// Dashboard.tsx - ALTERNATYWNE ROZWIĄZANIE Z WYŁĄCZONYM PAGER DLA COMMUNITY
+// Dashboard.tsx - pager with Home, My Posts, Community (blog removed)
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,6 @@ import PagerView from 'react-native-pager-view';
 import { DashboardHome } from './DashboardHome';
 import { UserPostsSection } from './community/UserPostsSection';
 import { CommunityFeedSection } from './community/CommunityFeedSection';
-import { BlogSection } from './blog/BlogSection';
 import { DashboardHeader } from './DashboardHeader';
 
 export const Dashboard: React.FC = () => {
@@ -18,21 +17,20 @@ export const Dashboard: React.FC = () => {
   const pagerRef = useRef<PagerView>(null);
   const [pagerEnabled, setPagerEnabled] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'home' | 'user-posts' | 'community' | 'blog'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'user-posts' | 'community'>('home');
 
   const HEADER_HEIGHT = Platform.OS === 'ios' ? 100 : 90;
   const pageHeight = Math.max(480, height - HEADER_HEIGHT - insets.bottom);
 
   /** Zmiana zakładki przez PagerView */
   const handleTabChange = useCallback(
-    (tab: 'home' | 'user-posts' | 'community' | 'blog') => {
+    (tab: 'home' | 'user-posts' | 'community') => {
       setActiveTab(tab);
 
       const pageIndex = {
         'home': 0,
         'user-posts': 1,
         'community': 2,
-        'blog': 3
       }[tab];
 
       if (pagerRef.current && pageIndex !== undefined) {
@@ -43,24 +41,15 @@ export const Dashboard: React.FC = () => {
   );
 
   /** Aktualizacja aktywnej zakładki gdy użytkownik przesuwa pager */
-  const handlePageSelected = useCallback(
-    (event: any) => {
-      const pageIndex = event.nativeEvent.position;
-      const tabs: ('home' | 'user-posts' | 'community' | 'blog')[] = ['home', 'user-posts', 'community', 'blog'];
-      
-      if (pageIndex >= 0 && pageIndex < tabs.length) {
-        setActiveTab(tabs[pageIndex]);
-        
-        // Wyłącz pager view gdy jesteśmy w community, włącz dla innych
-        if (tabs[pageIndex] === 'community') {
-          setPagerEnabled(false);
-        } else {
-          setPagerEnabled(true);
-        }
-      }
-    },
-    []
-  );
+  const handlePageSelected = useCallback((event: any) => {
+    const pageIndex = event.nativeEvent.position;
+    const tabs: ('home' | 'user-posts' | 'community')[] = ['home', 'user-posts', 'community'];
+    if (pageIndex >= 0 && pageIndex < tabs.length) {
+      setActiveTab(tabs[pageIndex]);
+      // Disable pager on community page
+      setPagerEnabled(tabs[pageIndex] !== 'community');
+    }
+  }, []);
 
   // Funkcja do włączenia pager view (wywoływana z CommunityFeedSection)
   const enablePagerView = useCallback(() => {
@@ -99,10 +88,6 @@ export const Dashboard: React.FC = () => {
           />
         </View>
 
-        {/* Sekcja Blog - Strona 3 */}
-        <View key="3" style={{ flex: 1 }}>
-          <BlogSection availableHeight={pageHeight} />
-        </View>
       </PagerView>
     </SafeAreaView>
   );
