@@ -1,89 +1,109 @@
-// Dashboard.tsx
-import React, { useMemo, useState, useRef } from 'react';
-import { View, FlatList, ListRenderItemInfo, useWindowDimensions, Platform } from 'react-native';
+// Dashboard.tsx - ALTERNATYWNE ROZWIĄZANIE Z WYŁĄCZONYM PAGER DLA COMMUNITY
+import React, { useMemo, useState, useRef, useCallback } from 'react';
+import { View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@context/ThemeContext';
+import PagerView from 'react-native-pager-view';
 
-// poprawione importy z pełną ścieżką
-import { DashboardHome } from './DashboardHome'; // ← DODAJ TEN IMPORT
-import { UserPostsSection } from './community/UserPostsSection.tsx';
-import { CommunityFeedSection } from './community/CommunityFeedSection.tsx';
-import { DashboardHeader } from './DashboardHeader.tsx';
+import { DashboardHome } from './DashboardHome';
+import { UserPostsSection } from './community/UserPostsSection';
+import { CommunityFeedSection } from './community/CommunityFeedSection';
 import { BlogSection } from './blog/BlogSection';
+import { DashboardHeader } from './DashboardHeader';
 
 export const Dashboard: React.FC = () => {
   const { palette } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const flatListRef = useRef<FlatList>(null);
+  const pagerRef = useRef<PagerView>(null);
+  const [pagerEnabled, setPagerEnabled] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'home' | 'user-posts' | 'community' | 'blog'>('home');
-  const data = useMemo(() => ['home', 'user-posts', 'community', 'blog'] as const, []);
 
   const HEADER_HEIGHT = Platform.OS === 'ios' ? 100 : 90;
   const pageHeight = Math.max(480, height - HEADER_HEIGHT - insets.bottom);
 
-  const handleTabChange = (tab: 'home' | 'user-posts' | 'community' | 'blog') => {
-    setActiveTab(tab);
-    const index = data.indexOf(tab);
-    if (flatListRef.current && index >= 0) {
-      try {
-        flatListRef.current.scrollToIndex({
-          index,
-          animated: true,
-          viewPosition: 0,
-        });
-      } catch (e) {
-        console.warn('Scroll error:', e);
+  /** Zmiana zakładki przez PagerView */
+  const handleTabChange = useCallback(
+    (tab: 'home' | 'user-posts' | 'community' | 'blog') => {
+      setActiveTab(tab);
+
+      const pageIndex = {
+        'home': 0,
+        'user-posts': 1,
+        'community': 2,
+        'blog': 3
+      }[tab];
+
+      if (pagerRef.current && pageIndex !== undefined) {
+        pagerRef.current.setPage(pageIndex);
       }
-    }
-  };
-
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const currentIndex = Math.round(offsetY / pageHeight);
-    if (currentIndex >= 0 && currentIndex < data.length) {
-      setActiveTab(data[currentIndex]);
-    }
-  };
-
-  const renderItem = ({ item }: ListRenderItemInfo<typeof data[number]>) => (
-    <View style={{ height: pageHeight }}>
-      {item === 'home' ? (
-        <DashboardHome />
-      ) : item === 'user-posts' ? (
-        <UserPostsSection availableHeight={pageHeight} />
-      ) : item === 'community' ? (
-        <CommunityFeedSection availableHeight={pageHeight} />
-      ) : (
-        <BlogSection availableHeight={pageHeight} />
-      )}
-    </View>
+    },
+    []
   );
+
+  /** Aktualizacja aktywnej zakładki gdy użytkownik przesuwa pager */
+  const handlePageSelected = useCallback(
+    (event: any) => {
+      const pageIndex = event.nativeEvent.position;
+      const tabs: ('home' | 'user-posts' | 'community' | 'blog')[] = ['home', 'user-posts', 'community', 'blog'];
+      
+      if (pageIndex >= 0 && pageIndex < tabs.length) {
+        setActiveTab(tabs[pageIndex]);
+        
+        // Wyłącz pager view gdy jesteśmy w community, włącz dla innych
+        if (tabs[pageIndex] === 'community') {
+          setPagerEnabled(false);
+        } else {
+          setPagerEnabled(true);
+        }
+      }
+    },
+    []
+  );
+
+  // Funkcja do włączenia pager view (wywoływana z CommunityFeedSection)
+  const enablePagerView = useCallback(() => {
+    setPagerEnabled(true);
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <DashboardHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
-      <FlatList
-        ref={flatListRef}
-        data={data}
-        keyExtractor={(k) => k}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        decelerationRate="fast"
-        bounces={false}
-        snapToInterval={pageHeight}
-        snapToAlignment="start"
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        getItemLayout={(_, index) => ({
-          length: pageHeight,
-          offset: pageHeight * index,
-          index,
-        })}
-        removeClippedSubviews={true}
-      />
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={0}
+        onPageSelected={handlePageSelected}
+        scrollEnabled={pagerEnabled}
+        orientation="vertical"
+        overdrag={true}
+        keyboardDismissMode="on-drag"
+      >
+        {/* Sekcja Home - Strona 0 */}
+        <View key="0" style={{ flex: 1 }}>
+          <DashboardHome />
+        </View>
+
+        {/* Sekcja My Posts - Strona 1 */}
+        <View key="1" style={{ flex: 1 }}>
+          <UserPostsSection availableHeight={pageHeight} />
+        </View>
+
+        {/* Sekcja Community - Strona 2 */}
+        <View key="2" style={{ flex: 1 }}>
+          <CommunityFeedSection 
+            availableHeight={pageHeight} 
+            onEnablePagerView={enablePagerView}
+          />
+        </View>
+
+        {/* Sekcja Blog - Strona 3 */}
+        <View key="3" style={{ flex: 1 }}>
+          <BlogSection availableHeight={pageHeight} />
+        </View>
+      </PagerView>
     </SafeAreaView>
   );
 };

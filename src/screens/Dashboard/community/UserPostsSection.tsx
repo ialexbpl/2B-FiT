@@ -1,10 +1,13 @@
-// community/UserPostsSection.tsx
-import React, { useMemo, useState } from 'react';
+// UserPostsSection.tsx - ZAKTUALIZOWANA WERSJA
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
-import type { Post, PostStats } from './community.types';
+import { usePosts } from '../../../hooks/usePosts';
+import { useAuth } from '../../../context/AuthContext';
+import { CreatePostModal } from './CreatePostModal';
+import type { PostStats } from './community.types';
 
 type Props = {
   availableHeight: number;
@@ -12,73 +15,78 @@ type Props = {
 
 export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const { palette } = useTheme();
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      user: {
-        id: 'user1',
-        username: 'your_username',
-        isVerified: true,
-      },
-      content: 'Just completed my morning workout! Feeling amazing after 45 minutes of intense cardio and strength training. 💪',
-      image: 'https://picsum.photos/400/300?random=1',
-      likes: 24,
-      comments: [
-        { id: 'c1', author: 'Anna', text: 'Great job!', userId: 'anna', timestamp: new Date().toISOString() },
-        { id: 'c2', author: 'Mark', text: 'Keep it up!', userId: 'mark', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      isLiked: true,
-      type: 'workout',
-      metrics: {
-        calories: 420,
-        duration: 45,
-      },
+  const { posts, loading, refreshing, likePost, refetch } = usePosts();
+  const { profile, session } = useAuth();
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  // Filtruj tylko posty bieżącego użytkownika
+  const userPosts = useMemo(() => {
+    console.log('🔍 Filtering user posts...');
+    const filtered = posts.filter(post => post.user_id === session?.user?.id);
+    console.log(`✅ Found ${filtered.length} user posts`);
+    return filtered;
+  }, [posts, session?.user?.id]);
+
+  // Auto-refresh po zamknięciu modala
+  useEffect(() => {
+    if (!createModalVisible) {
+      console.log('🔄 Auto-refreshing after modal close');
+      refetch();
+      setLastRefresh(new Date());
+    }
+  }, [createModalVisible]);
+
+  // Formatowanie czasu od ostatniego odświeżenia
+  const getTimeSinceLastRefresh = () => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - lastRefresh.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s ago`;
+    } else if (diffInSeconds < 3600) {
+      return `${Math.floor(diffInSeconds / 60)}m ago`;
+    } else {
+      return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    }
+  };
+
+  const convertToLegacyPost = (post: any) => ({
+    id: post.id,
+    user: {
+      id: post.user?.id || post.user_id || 'unknown',
+      username: post.user?.username || post.user?.full_name || 'You',
+      isVerified: false,
     },
-    {
-      id: '2',
-      user: {
-        id: 'user1',
-        username: 'your_username',
-        isVerified: true,
-      },
-      content: 'Healthy breakfast to start the day right! Avocado toast with poached eggs and fresh vegetables. 🥑🍳',
-      image: 'https://picsum.photos/400/300?random=2',
-      likes: 18,
-      comments: [
-        { id: 'c3', author: 'Olivia', text: 'Looks delicious!', userId: 'olivia', timestamp: new Date().toISOString() }
-      ],
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      isLiked: false,
-      type: 'meal',
-      metrics: {
-        calories: 350,
-      },
+    content: post.content,
+    image: post.image_url,
+    likes: post.likes_count || 0,
+    comments: [],
+    timestamp: post.created_at,
+    isLiked: post.is_liked || false,
+    type: post.post_type,
+    metrics: {
+      calories: post.calories || undefined,
+      duration: post.duration || undefined,
+      distance: post.distance || undefined,
+      weight: post.weight || undefined,
     },
-  ]);
+  });
 
   const stats: PostStats = {
-    posts: 12,
+    posts: userPosts.length,
     followers: 245,
     following: 156,
   };
 
-  const handleLike = (postId: string) => {
-    setPosts(currentPosts =>
-      currentPosts.map(post =>
-        post.id === postId
-          ? {
-              ...post,
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-            }
-          : post
-      )
-    );
-  };
-
   const handleComment = (postId: string) => {
     console.log('Open comments for post:', postId);
+  };
+
+  const handleRefresh = async () => {
+    console.log('🔄 Manual refresh started');
+    await refetch();
+    setLastRefresh(new Date());
   };
 
   const styles = useMemo(() => StyleSheet.create({
@@ -138,17 +146,43 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
       color: palette.subText,
       marginTop: 4,
     },
-    editButton: {
+    createButton: {
       backgroundColor: palette.primary,
       paddingHorizontal: 32,
       paddingVertical: 12,
       borderRadius: 20,
       alignSelf: 'center' as const,
+      marginBottom: 12,
     },
-    editButtonText: {
+    createButtonText: {
       color: palette.onPrimary,
       fontSize: 14,
       fontWeight: '600' as const,
+    },
+    refreshInfo: {
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+      paddingHorizontal: 16,
+    },
+    refreshText: {
+      fontSize: 12,
+      color: palette.subText,
+    },
+    refreshButton: {
+      backgroundColor: palette.primary + '20',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 12,
+      flexDirection: 'row' as const,
+      alignItems: 'center',
+    },
+    refreshButtonText: {
+      color: palette.primary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginLeft: 6,
     },
     emptyState: {
       flex: 1,
@@ -166,28 +200,55 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
       marginTop: 16,
       lineHeight: 22,
     },
-  }), [palette]);
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: availableHeight,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: palette.subText,
+    },
+  }), [palette, availableHeight]);
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="refresh" size={32} color={palette.subText} />
+        <Text style={styles.loadingText}>Loading your posts...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { height: availableHeight }]}>
       <FlatList
-        data={posts}
+        data={userPosts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent
-            post={item}
-            onLike={handleLike}
+            post={convertToLegacyPost(item)}
+            onLike={() => likePost(item.id)}
             onComment={handleComment}
           />
         )}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        nestedScrollEnabled={true}
+        style={{ flex: 1 }}
         ListHeaderComponent={
           <View style={styles.profileHeader}>
             <View style={styles.profileInfo}>
               <View style={styles.avatar}>
                 <Ionicons name="person" size={48} color={palette.subText} />
               </View>
-              <Text style={styles.username}>your_username</Text>
-              <Text style={styles.bio}>Fitness enthusiast • Healthy lifestyle • Progress over perfection</Text>
+              <Text style={styles.username}>{profile?.username || profile?.full_name || 'Your Profile'}</Text>
+              <Text style={styles.bio}>
+                {profile?.username ? `@${profile.username} • ` : ''}
+                Fitness enthusiast • Healthy lifestyle • Progress over perfection
+              </Text>
             </View>
             
             <View style={styles.statsContainer}>
@@ -205,9 +266,26 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.editButton}>
-              <Text style={styles.editButtonText}>Edit Profile</Text>
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => setCreateModalVisible(true)}
+            >
+              <Text style={styles.createButtonText}>Create Post</Text>
             </TouchableOpacity>
+
+            {/* Info o odświeżaniu */}
+            <View style={styles.refreshInfo}>
+              <Text style={styles.refreshText}>
+                Last refresh: {getTimeSinceLastRefresh()}
+              </Text>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={handleRefresh}
+              >
+                <Ionicons name="refresh" size={14} color={palette.primary} />
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -216,12 +294,27 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
             <Text style={styles.emptyStateText}>
               You haven't shared any posts yet.{'\n'}Start sharing your fitness journey!
             </Text>
-            <TouchableOpacity style={[styles.editButton, { marginTop: 20 }]}>
-              <Text style={styles.editButtonText}>Create First Post</Text>
+            <TouchableOpacity 
+              style={[styles.createButton, { marginTop: 20 }]}
+              onPress={() => setCreateModalVisible(true)}
+            >
+              <Text style={styles.createButtonText}>Create First Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+            >
+              <Ionicons name="refresh" size={14} color={palette.primary} />
+              <Text style={styles.refreshButtonText}>Refresh Posts</Text>
             </TouchableOpacity>
           </View>
         }
         showsVerticalScrollIndicator={false}
+      />
+
+      <CreatePostModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
       />
     </View>
   );
