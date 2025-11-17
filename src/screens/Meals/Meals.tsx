@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   Modal,
   Alert,
   ScrollView,
+  Pressable,
 } from "react-native";
 
 type Meal = {
@@ -91,6 +93,12 @@ export default function Meals() {
 
   const [meals, setMeals] = useState<Meal[]>(defaultMeals);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const navigation = useNavigation();
+
+  const openScanner = () => {
+    navigation.navigate("Scanner" as never);
+  };
 
   const [newMeal, setNewMeal] = useState({
     name: "",
@@ -315,8 +323,10 @@ export default function Meals() {
           </View>
         )}
       />
-   <View style={styles.qrButton}>
-        <MaterialIcons name="qr-code-scanner" size={35} color="#333" />
+      <View style={styles.qrButton}>
+        <Pressable onPress={openScanner}>
+            <MaterialIcons name="qr-code-scanner" size={35} color="#333" />
+        </Pressable>
       </View>
    
       <TouchableOpacity
