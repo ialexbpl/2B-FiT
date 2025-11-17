@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, Pressable, Platform } from 'react-native';
 import { Setting } from '@screens/Settings/Setting';
 import { useTheme } from '../context/ThemeContext';
+import Scanner from '@screens/Scanner/Scanner';
 
 /*
   Bottom tabs (my main navigation)
@@ -108,6 +109,11 @@ export function RootTabs() {
           tabBarButton: () => null,
           tabBarStyle: { display: 'none' },
         }}
+      />
+        <Tab.Screen
+        name="Scanner"
+        component={Scanner}
+        options={{ tabBarButton: () => null, headerShown: false }}
       />
     </Tab.Navigator>
   );
