@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Dashboard } from '@screens/Dashboard/Dashboard';
-import { Meals } from '@screens/Meals/Meals';
+import Meals from '@screens/Meals/Meals';
 import { AI } from '@screens/AI/AI';
 import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
@@ -86,7 +86,11 @@ export function RootTabs() {
       })}
   >
       <Tab.Screen name="Dashboard" component={Dashboard} />
-      <Tab.Screen name="Meals" component={Meals} />
+      <Tab.Screen
+      name="Meals" 
+      component={Meals} 
+      options={{ title: "Meals" }} 
+      />
       <Tab.Screen
         name="AI"
         component={AI}
