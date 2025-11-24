@@ -60,6 +60,43 @@ Example already included:
 - 4) Introduce Redux or Context for state if needed.
 - 5) Add EAS or prebuild only when native modules are required.
 
+## Friends & invitations (Supabase schema)
+The profile screen now ships with a “Friends” panel that searches all users (partial matches, live updates), lets you send invites, respond to incoming requests, and surfaces notifications when someone accepts your invitation. Supabase needs a small helper table plus RLS policies:
+
+```sql
+create table if not exists public.friendships (
+    id uuid primary key default uuid_generate_v4(),
+    requester_id uuid references auth.users not null,
+    addressee_id uuid references auth.users not null,
+    status text not null default 'pending' check (status in ('pending','accepted','blocked')),
+    created_at timestamptz not null default now(),
+    responded_at timestamptz,
+    requester_acknowledged boolean not null default false,
+    addressee_acknowledged boolean not null default false,
+    pair_key text generated always as (
+        least(requester_id::text, addressee_id::text) || '|' || greatest(requester_id::text, addressee_id::text)
+    ) stored,
+    constraint friendships_no_self check (requester_id <> addressee_id),
+    constraint friendships_pair_unique unique (pair_key)
+);
+
+alter table public.friendships enable row level security;
+
+create policy "friendships select" on public.friendships for select
+    using (auth.uid() in (requester_id, addressee_id));
+
+create policy "friendships insert" on public.friendships for insert
+    with check (auth.uid() = requester_id and requester_id <> addressee_id);
+
+create policy "friendships update" on public.friendships for update
+    using (auth.uid() in (requester_id, addressee_id));
+
+create policy "friendships delete" on public.friendships for delete
+    using (auth.uid() in (requester_id, addressee_id));
+```
+
+`requester_acknowledged` drives the “New confirmations” badge — after the invitee accepts (status ↦ `accepted`, `responded_at` stamped), the inviter sees the card until they tap **Got it** (row is updated with `requester_acknowledged = true`). Declining or canceling simply removes the row so users can send new invitations later.
+
 **Polski (PL)**
 - Szablon Expo + TypeScript działający w Expo Go. Minimalny, aby hot reload działał na iOS/Android bez konfiguracji natywnej. Każdy ekran ma własny folder.
 
