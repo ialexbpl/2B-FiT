@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  ScrollView,
+  FlatList,
   View,
   Text,
   Image,
@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { makeProfileStyles } from "./ProfileStyles";
 // theme palettes are provided via ThemeContext
 import { ProfileAchivment } from "./ProfileAchivment";
+import { FriendsPanel } from "./FriendsPanel";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigation } from "@react-navigation/native";
 import { useProfile } from "../../context/ProfileContext";
@@ -244,57 +245,70 @@ export const Profile: React.FC = () => {
     [navigation],
   );
 
+  const headerContent = (
+    <>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
+          <Icon name="settings-outline" size={26} color={palette.text} />
+        </TouchableOpacity>
+        {/* Add a simple placeholder to avoid RN source errors */}
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          onPress={handleAvatarPress}
+          activeOpacity={0.8}
+          disabled={isUploadingAvatar}
+        >
+          <Image source={avatarSource} style={styles.avatar} />
+          {isUploadingAvatar && (
+            <View style={styles.avatarUploading}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={openNameModal} activeOpacity={0.8}>
+          <Text style={styles.name}>{displayName}</Text>
+        </TouchableOpacity>
+        <Text style={styles.email}>{displayEmail}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Information</Text>
+        <View style={styles.infoGrid}>
+          {highlightItems.map(({ key, label, value, icon, targetModal }) => (
+            <TouchableOpacity
+              key={key}
+              style={styles.infoCard}
+              onPress={() => handleInfoCardPress(targetModal)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.infoIconWrapper}>
+                <Icon name={icon} size={20} color={palette.primary} />
+              </View>
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>{label}</Text>
+                <Text style={[styles.infoValue, { color: palette.subText }]}>{value}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <FriendsPanel />
+      <ProfileAchivment />
+    </>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScrollView style={{ backgroundColor: palette.background }}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
-            <Icon name="settings-outline" size={26} color={palette.text} />
-          </TouchableOpacity>
-          {/* Add a simple placeholder to avoid RN source errors */}
-          <TouchableOpacity
-            style={styles.avatarWrapper}
-            onPress={handleAvatarPress}
-            activeOpacity={0.8}
-            disabled={isUploadingAvatar}
-          >
-            <Image source={avatarSource} style={styles.avatar} />
-            {isUploadingAvatar && (
-              <View style={styles.avatarUploading}>
-                <ActivityIndicator color="#fff" />
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={openNameModal} activeOpacity={0.8}>
-            <Text style={styles.name}>{displayName}</Text>
-          </TouchableOpacity>
-          <Text style={styles.email}>{displayEmail}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Information</Text>
-          <View style={styles.infoGrid}>
-            {highlightItems.map(({ key, label, value, icon, targetModal }) => (
-              <TouchableOpacity
-                key={key}
-                style={styles.infoCard}
-                onPress={() => handleInfoCardPress(targetModal)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.infoIconWrapper}>
-                  <Icon name={icon} size={20} color={palette.primary} />
-                </View>
-                <View style={styles.infoTextWrapper}>
-                  <Text style={styles.infoLabel}>{label}</Text>
-                  <Text style={[styles.infoValue, { color: palette.subText }]}>{value}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <ProfileAchivment />
-      </ScrollView>
+      <FlatList
+        data={[]}
+        renderItem={() => null}
+        ListHeaderComponent={headerContent}
+        keyExtractor={(_, index) => `profile-static-${index}`}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        style={{ backgroundColor: palette.background }}
+      />
 
       <Modal
         transparent
