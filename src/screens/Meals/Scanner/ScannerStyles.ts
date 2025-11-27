@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { theme, Palette } from "../../styles/theme";
+import { theme, Palette } from "../../../styles/theme";
 
 export const getScannerStyles = (palette: Palette) =>
   StyleSheet.create({

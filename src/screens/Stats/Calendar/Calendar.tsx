@@ -18,9 +18,9 @@ import moment from 'moment';
 import 'moment/locale/en-gb';
 import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
 
-import { useTheme } from '../../context/ThemeContext';
-import { theme } from '../../styles/theme';
-import { makeCalendarStyles } from '@screens/Calendar/CalendarStyles';
+import { useTheme } from '../../../context/ThemeContext';
+import { theme } from '../../../styles/theme';
+import { makeCalendarStyles } from '@screens/Stats/Calendar/CalendarStyles';
 
 moment.updateLocale('en', { week: { dow: 1 } });
 

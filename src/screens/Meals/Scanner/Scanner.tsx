@@ -20,9 +20,9 @@ import {
   fetchProductByBarcode,
   fetchProductByName,
   Product,
-} from "../../api/OpenFoodFacts";
+} from "../../../api/OpenFoodFacts";
 import { getScannerStyles } from "./ScannerStyles";
-import { useTheme } from "../../context/ThemeContext";
+import { useTheme } from "../../../context/ThemeContext";
 
 export default function Scanner() {
   const { palette } = useTheme();
