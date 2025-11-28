@@ -9,6 +9,7 @@ export type ProfileSettingsRow = {
   goal_weight_kg: number | null;
   activity_level: 'Low' | 'Moderate' | 'High' | 'Very High' | null;
   updated_at?: string | null;
+  allergies: string[] | null;
 };
 
 export async function fetchProfileSettings(userId: string) {

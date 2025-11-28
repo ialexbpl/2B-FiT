@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { ActivityIndicator, Pressable, View, Platform, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
 import { Dashboard } from '@screens/Dashboard/Dashboard';
 import Meals from '@screens/Meals/Meals';
 import { AI } from '@screens/AI/AI';
 import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, Pressable, Platform } from 'react-native';
 import { Setting } from '@screens/Settings/Setting';
+import Scanner from '@screens/Meals/Scanner/Scanner';
+
 import { useTheme } from '../context/ThemeContext';
-import Scanner from '@screens/Scanner/Scanner';
+import { supabase } from '@utils/supabase';
+import { fetchProfileSettings } from '@utils/profileSettingsApi';
+import SurveyScreen from '@screens/Login/Onboarding/SurveyScreen';
+
 
 /*
   Bottom tabs (my main navigation)
@@ -59,6 +65,83 @@ function AITabButton({ onPress, accessibilityState }: any) {
 
 export function RootTabs() {
   const { theme, palette } = useTheme();
+
+  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [hasProfile, setHasProfile] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) {
+            setHasProfile(false);
+            setCheckingProfile(false);
+          }
+          return;
+        }
+
+        const profile = await fetchProfileSettings(user.id);
+        if (!cancelled) {
+          const completed = Boolean(
+            profile &&
+              profile.sex &&
+              profile.age !== null &&
+              profile.height_cm !== null &&
+              profile.weight_kg !== null &&
+              profile.goal_weight_kg !== null &&
+              profile.activity_level &&
+              profile.allergies &&
+              profile.allergies.length > 0
+          );
+
+          setHasProfile(completed);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch profile settings', e);
+        if (!cancelled) {
+          setHasProfile(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingProfile(false);
+        }
+      }
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (checkingProfile) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: palette.background,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!hasProfile) {
+    return (
+      <SurveyScreen
+        onCompleted={() => setHasProfile(true)}
+      />
+    );
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

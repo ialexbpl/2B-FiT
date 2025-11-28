@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, ScrollView, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import Calendar from '../Calendar/Calendar';
+import Calendar from './Calendar/Calendar';
 
 export const Stats: React.FC = () => {
   const { palette } = useTheme();

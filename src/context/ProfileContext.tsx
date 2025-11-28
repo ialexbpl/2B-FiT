@@ -22,6 +22,7 @@ type ProfileContextValue = ProfileData & {
   setGoalWeight: (v: string) => void;
   setActivityLevel: (v: string | null) => void;
   setAllergies: (v: string[]) => void;
+  refreshProfileSettings: () => Promise<void>;
 };
 
 const defaultValue: ProfileContextValue = {
@@ -39,6 +40,7 @@ const defaultValue: ProfileContextValue = {
   setGoalWeight: () => {},
   setActivityLevel: () => {},
   setAllergies: () => {},
+  refreshProfileSettings: async () => {},
 };
 
 const ProfileContext = createContext<ProfileContextValue>(defaultValue);
@@ -52,6 +54,22 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
   const [activityLevel, setActivityLevel] = useState<string | null>(defaultValue.activityLevel);
   const [allergies, setAllergies] = useState<string[]>(defaultValue.allergies);
   const { session } = useAuth();
+
+  const refreshProfileSettings = React.useCallback(async () => {
+    if (!session?.user) return;
+
+    const row = await fetchProfileSettings(session.user.id);
+    if (row) {
+      if (row.sex) setSex(row.sex as Sex);
+      if (row.age != null) setAge(String(row.age));
+      if (row.height_cm != null) setHeight(String(row.height_cm));
+      if (row.weight_kg != null) setWeight(String(row.weight_kg));
+      if (row.goal_weight_kg != null) setGoalWeight(String(row.goal_weight_kg));
+      if (row.activity_level) setActivityLevel(row.activity_level);
+      if (Array.isArray(row.allergies)) setAllergies(row.allergies);
+    }
+  }, [session?.user?.id]);
+
 
   // Load once on login:
   // 1) Try local cache (AsyncStorage) so we have values offline / before network
@@ -68,21 +86,16 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         if (cached.weight_kg != null) setWeight(String(cached.weight_kg));
         if (cached.goal_weight_kg != null) setGoalWeight(String(cached.goal_weight_kg));
         if (cached.activity_level) setActivityLevel(cached.activity_level);
+        if (Array.isArray((cached as any).allergies)) {
+         setAllergies((cached as any).allergies);
+      }
       }
 
-      // Then fetch from Supabase and override with server truth if present
-      const row = await fetchProfileSettings(session.user.id);
-      if (row) {
-        if (row.sex) setSex(row.sex as Sex);
-        if (row.age != null) setAge(String(row.age));
-        if (row.height_cm != null) setHeight(String(row.height_cm));
-        if (row.weight_kg != null) setWeight(String(row.weight_kg));
-        if (row.goal_weight_kg != null) setGoalWeight(String(row.goal_weight_kg));
-        if (row.activity_level) setActivityLevel(row.activity_level);
-      }
+      await refreshProfileSettings();
+
     };
     load();
-  }, [session?.user?.id]);
+  }, [session?.user?.id, refreshProfileSettings]);
 
   // Save whenever settings change (debounced):
   // - Upsert to Supabase (per-user row in profile_settings)
@@ -97,6 +110,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         weight_kg: Number(weight) || null,
         goal_weight_kg: Number(goalWeight) || null,
         activity_level: activityLevel as any,
+        allergies,
       }).catch(err => console.error('Failed to save profile settings', err));
       // Also cache locally for offline/startup use
       saveProfileSettingsCache({
@@ -106,11 +120,11 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         weight_kg: Number(weight) || null,
         goal_weight_kg: Number(goalWeight) || null,
         activity_level: activityLevel as any,
+        allergies,
       });
     }, 500);
     return () => clearTimeout(timeout);
-  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel]);
-
+  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel, allergies]);
   const value = useMemo<ProfileContextValue>(() => ({
     sex,
     age,
@@ -126,7 +140,8 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
     setGoalWeight,
     setActivityLevel,
     setAllergies,
-  }), [sex, age, height, weight, goalWeight, activityLevel, allergies]);
+    refreshProfileSettings,
+  }), [sex, age, height, weight, goalWeight, activityLevel, allergies, refreshProfileSettings]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };

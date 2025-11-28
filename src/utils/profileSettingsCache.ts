@@ -9,6 +9,7 @@ export type CachedProfileSettings = {
   weight_kg: number | null;
   goal_weight_kg: number | null;
   activity_level: 'Low' | 'Moderate' | 'High' | 'Very High' | null;
+  allergies: string[] | null;
 };
 
 const KEY = '@profile_settings_cache_v1';
