@@ -7,6 +7,7 @@ import { PostComponent } from './PostComponent';
 import { usePosts } from '../../../hooks/usePosts';
 import { CreatePostModal } from './CreatePostModal';
 import { useAuth } from '@context/AuthContext';
+import { CommentsSheet } from './CommentsSheet';
 
 type Props = {
   availableHeight: number;
@@ -19,9 +20,10 @@ export const CommunityFeedSection: React.FC<Props> = ({
 }) => {
   const { palette } = useTheme();
   const { profile } = useAuth();
-  const { posts, loading, refreshing, likePost, refetch } = usePosts();
+  const { posts, loading, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
     image: post.image_url,
     likes: post.likes_count || 0,
     comments: [],
+    commentsCount: post.comments_count || 0,
     timestamp: post.created_at,
     isLiked: post.is_liked || false,
     type: post.post_type,
@@ -61,7 +64,9 @@ export const CommunityFeedSection: React.FC<Props> = ({
     },
   });
 
-  const handleComment = (postId: string) => {};
+  const handleComment = (postId: string) => {
+    setCommentPostId(postId);
+  };
 
   const handleRefresh = async () => {
     await refetch();
@@ -224,6 +229,17 @@ export const CommunityFeedSection: React.FC<Props> = ({
       <CreatePostModal
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
+      />
+
+      <CommentsSheet
+        visible={!!commentPostId}
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
+        onCommentAdded={() => {
+          if (commentPostId) {
+            adjustCommentCount(commentPostId, 1);
+          }
+        }}
       />
     </View>
   );

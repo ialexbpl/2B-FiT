@@ -14,6 +14,7 @@ type PostComponentProps = {
 
 export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment, onDelete }) => {
   const { palette } = useTheme();
+  const commentCount = post.commentsCount ?? post.comments?.length ?? 0;
 
   const formatTimestamp = (timestamp: string) => {
     const now = new Date();
@@ -260,7 +261,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
         >
           <Ionicons name="chatbubble-outline" size={20} color={palette.text} />
           <Text style={[styles.actionText, { color: palette.text }]}>
-            {post.comments.length}
+            {commentCount}
           </Text>
         </TouchableOpacity>
 

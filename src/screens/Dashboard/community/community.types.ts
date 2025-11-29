@@ -21,7 +21,8 @@ export type Post = {
   title?: string;
   image?: string;
   likes: number;
-  comments: Comment[]; // TO JEST TABLICA OBIEKTÓW Comment
+  comments: Comment[];
+  commentsCount?: number;
   timestamp: string;
   isLiked: boolean;
   type: 'workout' | 'meal' | 'progress' | 'achievement' | 'blog';

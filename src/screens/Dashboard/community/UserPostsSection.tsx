@@ -8,6 +8,7 @@ import { usePosts } from '../../../hooks/usePosts';
 import { useAuth } from '../../../context/AuthContext';
 import { CreatePostModal } from './CreatePostModal';
 import type { PostStats } from './community.types';
+import { CommentsSheet } from './CommentsSheet';
 
 type Props = {
   availableHeight: number;
@@ -15,10 +16,11 @@ type Props = {
 
 export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const { palette } = useTheme();
-  const { posts, loading, refreshing, likePost, deletePost, refetch } = usePosts();
+  const { posts, loading, refreshing, likePost, deletePost, refetch, adjustCommentCount } = usePosts();
   const { profile, session } = useAuth();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
   const userPosts = useMemo(() => {
     const filtered = posts.filter(post => post.user_id === session?.user?.id);
@@ -52,6 +54,7 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     image: post.image_url,
     likes: post.likes_count || 0,
     comments: [],
+    commentsCount: post.comments_count || 0,
     timestamp: post.created_at,
     isLiked: post.is_liked || false,
     type: post.post_type,
@@ -69,7 +72,9 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     following: 156,
   };
 
-  const handleComment = (postId: string) => {};
+  const handleComment = (postId: string) => {
+    setCommentPostId(postId);
+  };
 
   const handleRefresh = async () => {
     await refetch();
@@ -253,6 +258,17 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
       <CreatePostModal
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
+      />
+
+      <CommentsSheet
+        visible={!!commentPostId}
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
+        onCommentAdded={() => {
+          if (commentPostId) {
+            adjustCommentCount(commentPostId, 1);
+          }
+        }}
       />
     </View>
   );
