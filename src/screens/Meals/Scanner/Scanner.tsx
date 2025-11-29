@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
   CameraView,
   useCameraPermissions,
@@ -25,6 +27,7 @@ import { getScannerStyles } from "./ScannerStyles";
 import { useTheme } from "../../../context/ThemeContext";
 
 export default function Scanner() {
+  const navigation = useNavigation();
   const { palette } = useTheme();
   const styles = getScannerStyles(palette);
 
@@ -155,6 +158,10 @@ export default function Scanner() {
 
   return (
     <View style={styles.container}>
+      <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={12}>
+        <MaterialIcons name="arrow-back" size={26} color={palette.onPrimary} />
+      </Pressable>
+
       <CameraView
         style={styles.camera}
         facing="back"

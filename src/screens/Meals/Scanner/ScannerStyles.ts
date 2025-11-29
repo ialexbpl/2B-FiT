@@ -12,6 +12,16 @@ export const getScannerStyles = (palette: Palette) =>
       flex: 1,
     },
 
+    backButton: {
+      position: "absolute",
+      top: theme.spacing(4),
+      left: theme.spacing(2),
+      zIndex: 10,
+      padding: theme.spacing(1),
+      borderRadius: theme.radius.xl,
+      backgroundColor: palette.overlay ?? "#00000080",
+    },
+
     /* -------- PERMISSIONS SCREEN -------- */
     permissionContainer: {
       flex: 1,
