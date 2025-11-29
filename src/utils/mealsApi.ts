@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { FoodItem, LogEntry, MealType, DailySummary } from '../models/MealModel';
+import { DEFAULT_FOODS } from '../constants/defaultFoods';
 
 // --- User Foods (Custom Database) ---
 
@@ -12,6 +13,12 @@ export async function fetchUserFoods(userId: string): Promise<FoodItem[]> {
 
     if (error) throw error;
     return data || [];
+}
+
+// Returns built-in foods (shared for all users) + user-specific ones.
+export async function fetchAvailableFoods(userId: string): Promise<FoodItem[]> {
+    const userFoods = await fetchUserFoods(userId);
+    return [...DEFAULT_FOODS, ...userFoods];
 }
 
 export async function addUserFood(userId: string, food: Omit<FoodItem, 'id' | 'user_id' | 'created_at'>) {

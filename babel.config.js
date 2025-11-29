@@ -18,6 +18,7 @@ module.exports = function (api) {
             '@redux': './src/redux',
             '@screens': './src/screens',
             '@styles': './src/styles',
+            '@constants': './src/constants',
             '@typings': './src/typings',
             '@utils': './src/utils'
           }
