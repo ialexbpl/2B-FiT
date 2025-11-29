@@ -15,87 +15,121 @@ export const makeAIStyles = (palette: Palette, theme = tokens) =>
       backgroundColor: palette.background,
     },
 
-    // Only messages area scrolls (no extra card)
+    // Only messages area scrolls
     messagesScroll: {
       flex: 1,
     },
     messagesContent: {
-      paddingHorizontal: 10,
-      paddingTop: 10,
-      paddingBottom: 12,
+      paddingHorizontal: 16,
+      paddingTop: 20,
+      paddingBottom: 20,
     },
 
     messageRow: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
-      marginBottom: 10,
+      marginBottom: 16,
+      maxWidth: '100%',
     },
     left: { justifyContent: 'flex-start' },
-    right: { justifyContent: 'flex-end', alignSelf: 'flex-end' },
+    right: { justifyContent: 'flex-end' },
 
     avatar: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      marginRight: 8,
-      borderWidth: 1,
-      borderColor: palette.border,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      marginRight: 10,
+      backgroundColor: palette.card, // Fallback if image fails
+      alignSelf: 'flex-end', // Align avatar to bottom of message group
+      marginBottom: 4,
     },
 
     bubble: {
-      maxWidth: '80%',
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      borderRadius: 14,
-      borderWidth: 1,
+      maxWidth: '75%',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      // Shadow for depth
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
-    // Subtle differentiation via border color; both still match the app surface
-    bubbleAI: { backgroundColor: palette.card, borderColor: palette.border },
-    bubbleUser: { backgroundColor: palette.card, borderColor: theme.colors.primary },
 
-    messageText: { fontSize: 16, lineHeight: 22 },
-    messageTextAI: { color: palette.text },
-    messageTextUser: { color: palette.text },
+    bubbleAI: {
+      backgroundColor: palette.card,
+      borderBottomLeftRadius: 4, // Chat bubble effect
+    },
+    bubbleUser: {
+      backgroundColor: theme.colors.primary,
+      borderBottomRightRadius: 4, // Chat bubble effect
+    },
+
+    messageText: {
+      fontSize: 16,
+      lineHeight: 24,
+      fontFamily: 'Inter-Regular', // Assuming Inter is available, else falls back
+    },
+    messageTextAI: {
+      color: palette.text,
+    },
+    messageTextUser: {
+      color: palette.onPrimary, // White or contrasting text for primary color
+    },
 
     timeText: {
-      marginTop: 6,
-      fontSize: 12,
+      marginTop: 4,
+      fontSize: 11,
       color: palette.subText,
       textAlign: 'right',
+      opacity: 0.7,
     },
 
     inputBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 8,
-      gap: 8, // Replace with margins if supporting older RN
-      borderTopWidth: 1,
-      borderTopColor: palette.border,
-      backgroundColor: palette.card,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: palette.background, // Seamless with background
+      // borderTopWidth: 1,
+      // borderTopColor: palette.border,
     },
     textInput: {
       flex: 1,
-      minHeight: 40,
-      maxHeight: 120,
-      paddingHorizontal: 12,
+      minHeight: 44,
+      maxHeight: 100,
+      paddingHorizontal: 16,
       paddingVertical: 10,
-      borderRadius: theme.radius.md,
-      borderWidth: 1,
-      borderColor: palette.border,
+      borderRadius: 24, // Pill shape
+      backgroundColor: palette.card,
       color: palette.text,
-      backgroundColor: palette.background,
+      fontSize: 16,
+      marginRight: 10,
+      // Shadow for input
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
     },
     iconButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
     iconSecondary: {
+      marginRight: 10,
       backgroundColor: palette.card,
-      borderWidth: 1,
-      borderColor: palette.border,
     },
-    iconPrimary: { backgroundColor: tokens.colors.primary },
+    iconPrimary: {
+      backgroundColor: theme.colors.primary,
+      // Shadow for send button
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
   });

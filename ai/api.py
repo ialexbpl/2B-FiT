@@ -1,0 +1,149 @@
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from dotenv import load_dotenv
+from openai import OpenAI
+from datasets import load_dataset
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# -----------------------------
+# Global State
+# -----------------------------
+state = {
+    "prompts": [],
+    "responses": [],
+    "prompt_embeddings": None,
+    "embedder": None,
+    "client": None
+}
+
+# -----------------------------
+# Lifespan (Startup/Shutdown)
+# -----------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Load Config
+    load_dotenv()
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    if not HF_TOKEN:
+        print("❌ WARNING: HF_TOKEN not found in .env")
+    
+    state["client"] = OpenAI(
+        base_url="https://router.huggingface.co/v1",
+        api_key=HF_TOKEN,
+    )
+
+    # 2. Load Dataset
+    print("📦 Loading dataset...")
+    try:
+        dataset = load_dataset("alexjk1m/diet-planning-evaluation-20250531-140436")
+        train_data = dataset["train"]
+        state["prompts"] = [row["Full Prompt"] for row in train_data]
+        state["responses"] = [row["Model Response"] for row in train_data]
+        print(f"✅ Loaded {len(state['prompts'])} records.")
+    except Exception as e:
+        print(f"❌ Error loading dataset: {e}")
+
+    # 3. Load Embeddings
+    print("🧠 Loading embeddings model...")
+    try:
+        state["embedder"] = SentenceTransformer("all-MiniLM-L6-v2")
+        state["prompt_embeddings"] = state["embedder"].encode(state["prompts"], convert_to_tensor=True)
+        print("✅ Embeddings ready.")
+    except Exception as e:
+        print(f"❌ Error loading embeddings: {e}")
+
+    yield
+    # Shutdown logic if needed
+    print("👋 Shutting down AI API")
+
+app = FastAPI(lifespan=lifespan)
+
+# -----------------------------
+# Models
+# -----------------------------
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    response: str
+    similarity: float
+    source: str  # "dataset" or "ai"
+
+# -----------------------------
+# Logic
+# -----------------------------
+def search_similar_prompt(query, top_k=1):
+    if not state["embedder"] or state["prompt_embeddings"] is None:
+        return []
+    
+    query_embedding = state["embedder"].encode([query], convert_to_tensor=True)
+    similarities = cosine_similarity(query_embedding, state["prompt_embeddings"])[0]
+    top_indices = np.argsort(similarities)[::-1][:top_k]
+    
+    results = []
+    for i in top_indices:
+        results.append({
+            "prompt": state["prompts"][i],
+            "response": state["responses"][i],
+            "similarity": float(similarities[i])
+        })
+    return results
+
+# -----------------------------
+# Endpoints
+# -----------------------------
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    user_input = request.message.strip()
+    if not user_input:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # 1. Search in Dataset
+    results = search_similar_prompt(user_input, top_k=1)
+    
+    best_match = results[0] if results else None
+    similarity = best_match["similarity"] if best_match else 0.0
+
+    # 2. Threshold Check
+    if best_match and similarity > 0.45:
+        print(f"📚 Match found (sim: {similarity:.2f})")
+        
+        # AI Interpretation
+        try:
+            completion = state["client"].chat.completions.create(
+                model="moonshotai/Kimi-K2-Instruct-0905",
+                messages=[
+                    {"role": "system", "content": "Jesteś ekspertem ds. diety. Pomóż użytkownikowi zrozumieć wynik."},
+                    {"role": "user", "content": f"Użytkownik zapytał: {user_input}\nOdpowiedź z datasetu: {best_match['response']}\n\nWyjaśnij to prostym językiem i daj wskazówki praktyczne."}
+                ],
+            )
+            ai_reply = completion.choices[0].message.content
+            return ChatResponse(response=ai_reply, similarity=similarity, source="dataset+ai")
+        except Exception as e:
+            print(f"⚠️ AI Error: {e}")
+            # Fallback to raw dataset response if AI fails
+            return ChatResponse(response=best_match["response"], similarity=similarity, source="dataset")
+
+    else:
+        # 3. No Match - Ask AI directly
+        print("🤔 No match, asking AI...")
+        try:
+            completion = state["client"].chat.completions.create(
+                model="moonshotai/Kimi-K2-Instruct-0905",
+                messages=[
+                    {"role": "user", "content": user_input}
+                ],
+            )
+            ai_reply = completion.choices[0].message.content
+            return ChatResponse(response=ai_reply, similarity=0.0, source="ai")
+        except Exception as e:
+            print(f"⚠️ AI Error: {e}")
+            raise HTTPException(status_code=500, detail="AI service unavailable")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
