@@ -1,6 +1,6 @@
-﻿import React, { useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -11,19 +11,30 @@ import {
   Modal,
   Alert,
   Pressable,
+  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useTheme } from "@context/ThemeContext";
 import { theme, type Palette } from "@styles/theme";
+import { useAuth } from "@context/AuthContext";
+import {
+  fetchUserFoods,
+  addUserFood,
+  deleteUserFood,
+  updateUserFood,
+  fetchDailyLog,
+  addToLog,
+  deleteLogEntry,
+  calculateSummary
+} from "@utils/mealsApi";
+import type { FoodItem, LogEntry, MealType } from "@models/MealModel";
 
-type Meal = {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  tags?: string[];
-};
+const MEAL_TYPES: { id: MealType; label: string }[] = [
+  { id: 'breakfast', label: 'Śniadanie' },
+  { id: 'lunch', label: 'Obiad' },
+  { id: 'dinner', label: 'Kolacja' },
+  { id: 'snack', label: 'Przekąski' },
+];
 
 const makeStyles = (palette: Palette) =>
   StyleSheet.create({
@@ -31,10 +42,10 @@ const makeStyles = (palette: Palette) =>
       flex: 1,
       backgroundColor: palette.background,
     },
-    listContent: {
+    header: {
       paddingHorizontal: 16,
-      paddingVertical: 20,
-      paddingBottom: 160,
+      paddingTop: 20,
+      paddingBottom: 10,
     },
     title: {
       fontSize: 24,
@@ -42,6 +53,201 @@ const makeStyles = (palette: Palette) =>
       color: palette.text,
       marginBottom: 16,
     },
+    tabs: {
+      flexDirection: 'row',
+      marginBottom: 16,
+      backgroundColor: palette.card,
+      borderRadius: theme.radius.lg,
+      padding: 4,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: 'center',
+      borderRadius: theme.radius.md,
+    },
+    activeTab: {
+      backgroundColor: palette.primary,
+    },
+    tabText: {
+      fontWeight: '600',
+      color: palette.subText,
+    },
+    activeTabText: {
+      color: palette.onPrimary,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+      paddingHorizontal: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    sectionMeta: {
+      fontSize: 14,
+      color: palette.subText,
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: theme.radius.lg,
+      padding: 16,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    cardContent: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    cardSubtitle: {
+      fontSize: 13,
+      color: palette.subText,
+      marginTop: 4,
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    actionBtn: {
+      padding: 8,
+      marginLeft: 8,
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 24,
+      backgroundColor: palette.primary,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    modalBg: {
+      flex: 1,
+      backgroundColor: palette.overlay,
+      justifyContent: "center",
+      padding: 24,
+    },
+    modal: {
+      backgroundColor: palette.card100,
+      borderRadius: theme.radius.lg,
+      padding: 20,
+      maxHeight: '80%',
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    input: {
+      backgroundColor: palette.background,
+      color: palette.text,
+      padding: 12,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 12,
+    },
+    btn: {
+      backgroundColor: palette.primary,
+      padding: 14,
+      borderRadius: theme.radius.md,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    btnText: {
+      color: palette.onPrimary,
+      fontWeight: "700",
+      fontSize: 16,
+    },
+    cancelBtn: {
+      padding: 14,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    cancelBtnText: {
+      color: palette.subText,
+      fontWeight: "600",
+    },
+    summaryBox: {
+      backgroundColor: palette.card,
+      margin: 16,
+      padding: 16,
+      borderRadius: theme.radius.lg,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    summaryLabel: {
+      color: palette.subText,
+      fontSize: 14,
+    },
+    summaryValue: {
+      color: palette.text,
+      fontWeight: '700',
+      fontSize: 14,
+    },
+    emptyText: {
+      textAlign: 'center',
+      color: palette.subText,
+      marginTop: 20,
+      fontStyle: 'italic',
+    },
+    typeSelector: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
+    typeBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.background,
+    },
+    typeBtnActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    typeBtnText: {
+      color: palette.subText,
+      fontSize: 13,
+    },
+    typeBtnTextActive: {
+      color: palette.onPrimary,
+      fontWeight: '600',
+    },
+    // --- Restored Styles ---
     topButtons: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -65,6 +271,7 @@ const makeStyles = (palette: Palette) =>
     smallBtnText: {
       fontWeight: "600",
       color: palette.text,
+      fontSize: 12,
     },
     smallBtnAccent: {
       backgroundColor: palette.primary,
@@ -98,16 +305,6 @@ const makeStyles = (palette: Palette) =>
       fontWeight: "600",
       marginRight: 12,
     },
-    input: {
-      borderWidth: 1,
-      borderColor: palette.border,
-      borderRadius: theme.radius.md,
-      backgroundColor: palette.card100,
-      color: palette.text,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      marginBottom: 12,
-    },
     toggle: {
       flexBasis: "32%",
       alignItems: "center",
@@ -129,57 +326,10 @@ const makeStyles = (palette: Palette) =>
     toggleText: {
       fontWeight: "600",
       color: palette.text,
+      fontSize: 11,
     },
     toggleTextOn: {
       color: palette.onPrimary,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: palette.text,
-    },
-    sectionSpacing: {
-      marginTop: 8,
-      marginBottom: 12,
-    },
-    mealCard: {
-      borderWidth: 1,
-      borderColor: palette.border,
-      borderRadius: theme.radius.lg,
-      padding: 16,
-      backgroundColor: palette.card,
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 12,
-    },
-    mealName: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: palette.text,
-    },
-    mealInfo: {
-      fontSize: 13,
-      marginTop: 4,
-      color: palette.text,
-    },
-    tagsText: {
-      fontSize: 12,
-      marginTop: 6,
-      color: palette.subText,
-    },
-    deleteBtn: {
-      marginLeft: 16,
-      backgroundColor: theme.colors.danger,
-      width: 40,
-      height: 40,
-      borderRadius: theme.radius.md,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    deleteText: {
-      color: "#fff",
-      fontSize: 18,
-      fontWeight: "700",
     },
     addButton: {
       marginTop: 12,
@@ -230,117 +380,258 @@ const makeStyles = (palette: Palette) =>
       color: palette.subText,
       marginTop: 8,
     },
-    emptyList: {
-      textAlign: "center",
-      marginBottom: 24,
-      color: palette.subText,
-    },
-    footer: {
-      paddingBottom: 12,
-    },
-    qrButton: {
-      position: "absolute",
-      right: 20,
-      bottom: 24,
-      backgroundColor: palette.card,
-      borderRadius: 28,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: palette.border,
-    },
-    modalBg: {
-      flex: 1,
-      backgroundColor: palette.overlay,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 24,
-    },
-    modal: {
-      width: "100%",
-      maxWidth: 420,
-      backgroundColor: palette.card100,
-      borderRadius: theme.radius.lg,
-      borderWidth: 1,
-      borderColor: palette.border,
-      padding: 20,
-    },
-    modalTitle: {
-      fontSize: 18,
+    mealName: {
+      fontSize: 16,
       fontWeight: "700",
       color: palette.text,
-      marginBottom: 12,
     },
-    saveBtn: {
-      backgroundColor: palette.primary,
-      borderRadius: theme.radius.md,
-      paddingVertical: 12,
-      alignItems: "center",
-      marginTop: 8,
-    },
-    saveBtnText: {
-      color: palette.onPrimary,
-      fontWeight: "600",
-    },
-    cancelBtn: {
-      paddingVertical: 12,
-      alignItems: "center",
-      marginTop: 8,
-    },
-    cancelBtnText: {
-      color: palette.subText,
-      fontWeight: "600",
+    mealInfo: {
+      fontSize: 13,
+      marginTop: 4,
+      color: palette.text,
     },
   });
+
+
 
 export default function Meals() {
   const { palette } = useTheme();
   const styles = useMemo(() => makeStyles(palette), [palette]);
-  const placeholderColor = palette.subText;
+  const { session } = useAuth();
   const navigation = useNavigation();
 
-  const defaultMeals: Meal[] = [
-    { id: "1", name: "Owsianka z owocami", calories: 420, protein: 20, carbs: 60, fat: 10, tags: ["vegetarian", "lactose-free"] },
-    { id: "2", name: "Kanapka z kurczakiem", calories: 380, protein: 30, carbs: 40, fat: 8, tags: ["gluten-free"] },
-    { id: "3", name: "Sałatka z ciecierzycą", calories: 350, protein: 18, carbs: 30, fat: 12, tags: ["vegetarian", "gluten-free", "lactose-free"] },
-    { id: "4", name: "Makaron z pesto", calories: 560, protein: 15, carbs: 75, fat: 18, tags: ["vegetarian"] },
-    { id: "5", name: "Ryż z warzywami i tofu", calories: 480, protein: 25, carbs: 60, fat: 12, tags: ["vegetarian", "gluten-free", "lactose-free"] },
-    { id: "6", name: "Omlet z warzywami", calories: 300, protein: 22, carbs: 6, fat: 20, tags: ["gluten-free"] },
-    { id: "7", name: "Sałatka z łososiem", calories: 410, protein: 28, carbs: 8, fat: 28, tags: ["gluten-free", "lactose-free"] },
-  ];
+  const [activeTab, setActiveTab] = useState<'diary' | 'foods'>('diary');
+  const [loading, setLoading] = useState(false);
 
-  const [meals, setMeals] = useState<Meal[]>(defaultMeals);
-  const [modalVisible, setModalVisible] = useState(false);
+  // Data
+  const [foods, setFoods] = useState<FoodItem[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  // Modals
+  const [foodModalVisible, setFoodModalVisible] = useState(false);
+  const [logModalVisible, setLogModalVisible] = useState(false);
+
+  // Form State
+  const [editingFood, setEditingFood] = useState<FoodItem | null>(null);
+  const [foodForm, setFoodForm] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+  const [selectedFoodForLog, setSelectedFoodForLog] = useState<FoodItem | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>('breakfast');
+
+  const userId = session?.user?.id;
+  const today = new Date().toISOString().split('T')[0];
+
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const [fetchedFoods, fetchedLogs] = await Promise.all([
+        fetchUserFoods(userId),
+        fetchDailyLog(userId, today)
+      ]);
+      setFoods(fetchedFoods);
+      setLogs(fetchedLogs);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Błąd', 'Nie udało się pobrać danych.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, today]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  // --- Handlers: Foods ---
+
+  const handleSaveFood = async () => {
+    if (!userId) return;
+    if (!foodForm.name.trim()) {
+      Alert.alert('Błąd', 'Podaj nazwę posiłku.');
+      return;
+    }
+
+    const payload = {
+      name: foodForm.name.trim(),
+      calories: Number(foodForm.calories) || 0,
+      protein: Number(foodForm.protein) || 0,
+      carbs: Number(foodForm.carbs) || 0,
+      fat: Number(foodForm.fat) || 0,
+    };
+
+    try {
+      if (editingFood) {
+        // Edit
+        const updated = await updateUserFood(editingFood.id, payload);
+        setFoods(prev => prev.map(f => f.id === updated.id ? updated : f));
+        Alert.alert('Sukces', 'Posiłek zaktualizowany.');
+      } else {
+        // Add
+        const newFood = await addUserFood(userId, payload);
+        setFoods(prev => [...prev, newFood]);
+        Alert.alert('Sukces', 'Posiłek dodany.');
+      }
+      setFoodModalVisible(false);
+      resetFoodForm();
+    } catch (e) {
+      Alert.alert('Błąd', 'Nie udało się zapisać posiłku.');
+    }
+  };
+
+  const handleDeleteFood = async (id: string) => {
+    Alert.alert('Usuń', 'Czy na pewno chcesz usunąć ten posiłek?', [
+      { text: 'Anuluj', style: 'cancel' },
+      {
+        text: 'Usuń',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteUserFood(id);
+            setFoods(prev => prev.filter(f => f.id !== id));
+          } catch (e) {
+            Alert.alert('Błąd', 'Nie udało się usunąć.');
+          }
+        }
+      }
+    ]);
+  };
+
+  const openEditFood = (food: FoodItem) => {
+    setEditingFood(food);
+    setFoodForm({
+      name: food.name,
+      calories: String(food.calories),
+      protein: String(food.protein),
+      carbs: String(food.carbs),
+      fat: String(food.fat),
+    });
+    setFoodModalVisible(true);
+  };
+
+  const resetFoodForm = () => {
+    setEditingFood(null);
+    setFoodForm({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+  };
+
+  // --- Handlers: Diary ---
+
+  const handleAddToLog = async () => {
+    if (!userId || !selectedFoodForLog) return;
+    try {
+      const entry = await addToLog(userId, today, selectedMealType, selectedFoodForLog);
+      setLogs(prev => [...prev, entry]);
+      setLogModalVisible(false);
+      Alert.alert('Dodano', `Dodano do: ${MEAL_TYPES.find(t => t.id === selectedMealType)?.label}`);
+    } catch (e) {
+      Alert.alert('Błąd', 'Nie udało się dodać do dziennika.');
+    }
+  };
+
+  const handleDeleteLog = async (id: string) => {
+    try {
+      await deleteLogEntry(id);
+      setLogs(prev => prev.filter(l => l.id !== id));
+    } catch (e) {
+      Alert.alert('Błąd', 'Nie udało się usunąć wpisu.');
+    }
+  };
+
+  const openLogModal = (food: FoodItem) => {
+    setSelectedFoodForLog(food);
+    setLogModalVisible(true);
+  };
+
+  // --- Renderers ---
+
+  const renderDiary = () => {
+    const summary = calculateSummary(logs);
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        <View style={styles.summaryBox}>
+          <Text style={[styles.sectionTitle, { marginBottom: 16, textAlign: 'center' }]}>Podsumowanie dnia</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Kalorie</Text>
+            <Text style={styles.summaryValue}>{summary.calories} kcal</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Białko</Text>
+            <Text style={styles.summaryValue}>{summary.protein} g</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Węglowodany</Text>
+            <Text style={styles.summaryValue}>{summary.carbs} g</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tłuszcze</Text>
+            <Text style={styles.summaryValue}>{summary.fat} g</Text>
+          </View>
+        </View>
+
+        {MEAL_TYPES.map(type => {
+          const mealLogs = logs.filter(l => l.meal_type === type.id);
+          const mealCals = mealLogs.reduce((acc, l) => acc + l.calories, 0);
+
+          return (
+            <View key={type.id} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{type.label}</Text>
+                <Text style={styles.sectionMeta}>{mealCals} kcal</Text>
+              </View>
+              {mealLogs.length === 0 ? (
+                <Text style={[styles.emptyText, { marginTop: 0, marginBottom: 8, fontSize: 12 }]}>Brak wpisów</Text>
+              ) : (
+                mealLogs.map(log => (
+                  <View key={log.id} style={styles.card}>
+                    <View style={styles.cardContent}>
+                      <Text style={styles.cardTitle}>{log.food_name}</Text>
+                      <Text style={styles.cardSubtitle}>
+                        {log.calories} kcal • B: {log.protein} • W: {log.carbs} • T: {log.fat}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteLog(log.id)} style={styles.actionBtn}>
+                      <MaterialIcons name="close" size={20} color={theme.colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+              <TouchableOpacity
+                style={{ alignSelf: 'center', padding: 8 }}
+                onPress={() => {
+                  setActiveTab('foods');
+                  Alert.alert('Dodaj', 'Wybierz posiłek z listy, aby dodać go do dziennika.');
+                }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '600' }}>+ Dodaj produkt</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </ScrollView>
+    );
+  };
+
+  // --- Old Features: Sorting & Generator ---
+
   const [targetCalories, setTargetCalories] = useState<string>("2000");
   const [filterVegetarian, setFilterVegetarian] = useState(false);
   const [filterGlutenFree, setFilterGlutenFree] = useState(false);
   const [filterLactoseFree, setFilterLactoseFree] = useState(false);
-  const [generatedPlan, setGeneratedPlan] = useState<Meal[] | null>(null);
-  const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", carbs: "", fat: "" });
-
-  const openScanner = () => {
-    navigation.navigate("Scanner" as never);
-  };
-
-  const buildRestrictions = () => {
-    const reqs: string[] = [];
-    if (filterVegetarian) reqs.push("vegetarian");
-    if (filterGlutenFree) reqs.push("gluten-free");
-    if (filterLactoseFree) reqs.push("lactose-free");
-    return reqs;
-  };
-
-  const matchesRestrictions = (meal: Meal, reqs: string[]) => {
-    if (reqs.length === 0) return true;
-    const tags = meal.tags ?? [];
-    return reqs.every((req) => tags.includes(req));
-  };
+  const [generatedPlan, setGeneratedPlan] = useState<FoodItem[] | null>(null);
 
   const sortMeals = () => {
-    setMeals((prev) => [...prev].sort((a, b) => a.calories - b.calories));
+    setFoods(prev => [...prev].sort((a, b) => a.calories - b.calories));
   };
 
   const resetMeals = () => {
-    setMeals(defaultMeals);
+    loadData(); // Re-fetch from DB to reset order
+  };
+
+  const matchesRestrictions = (food: FoodItem, reqs: string[]) => {
+    if (reqs.length === 0) return true;
+    return true; // Placeholder logic as DB doesn't have tags yet
   };
 
   const generateMealPlan = () => {
@@ -350,15 +641,19 @@ export default function Meals() {
       return;
     }
 
-    const reqs = buildRestrictions();
-    let pool = meals.filter((meal) => matchesRestrictions(meal, reqs));
+    const reqs: string[] = [];
+    if (filterVegetarian) reqs.push("vegetarian");
+    if (filterGlutenFree) reqs.push("gluten-free");
+    if (filterLactoseFree) reqs.push("lactose-free");
+
+    let pool = foods.filter((f) => matchesRestrictions(f, reqs));
 
     if (pool.length === 0) {
       Alert.alert("Brak dopasowań", "Żaden posiłek nie spełnia wybranych filtrów.");
       return;
     }
 
-    const plan: Meal[] = [];
+    const plan: FoodItem[] = [];
     let sum = 0;
     const safeGuard = pool.length * 3;
     let iterations = 0;
@@ -366,24 +661,12 @@ export default function Meals() {
     while (sum < target && iterations < safeGuard) {
       iterations += 1;
       const candidate = pool[Math.floor(Math.random() * pool.length)];
-      if (!candidate) {
-        break;
-      }
+      if (!candidate) break;
 
-      if (matchesRestrictions(candidate, reqs)) {
-        plan.push(candidate);
-        sum += candidate.calories;
-      }
+      plan.push(candidate);
+      sum += candidate.calories;
 
-      if (sum >= target || pool.length === 1) {
-        break;
-      }
-
-      // remove candidate temporarily to avoid selecting it over and over
-      pool = pool.filter((m) => m.id !== candidate.id);
-      if (pool.length === 0) {
-        pool = meals.filter((meal) => matchesRestrictions(meal, reqs));
-      }
+      if (sum >= target) break;
     }
 
     setGeneratedPlan(plan);
@@ -391,61 +674,8 @@ export default function Meals() {
 
   const clearGeneratedPlan = () => setGeneratedPlan(null);
 
-  const addMeal = () => {
-    if (!newMeal.name.trim()) {
-      Alert.alert("Brak nazwy", "Podaj nazwę posiłku.");
-      return;
-    }
-
-    const calories = Number(newMeal.calories) || 0;
-    const protein = Number(newMeal.protein) || 0;
-    const carbs = Number(newMeal.carbs) || 0;
-    const fat = Number(newMeal.fat) || 0;
-
-    const meal: Meal = {
-      id: Date.now().toString(),
-      name: newMeal.name.trim(),
-      calories,
-      protein,
-      carbs,
-      fat,
-    };
-
-    setMeals((prev) => [meal, ...prev]);
-    setNewMeal({ name: "", calories: "", protein: "", carbs: "", fat: "" });
-    setModalVisible(false);
-  };
-
-  const deleteMeal = (id: string) => {
-    setMeals((prev) => prev.filter((meal) => meal.id !== id));
-  };
-
-  const renderMeal = ({ item }: { item: Meal }) => (
-    <View style={styles.mealCard}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.mealName}>{item.name}</Text>
-        <Text style={styles.mealInfo}>Kalorie: {item.calories} kcal</Text>
-        <Text style={styles.mealInfo}>
-          B: {item.protein}g | W: {item.carbs}g | T: {item.fat}g
-        </Text>
-        <Text style={styles.tagsText}>
-          {item.tags?.length ? item.tags.join(" • ") : "Brak tagów"}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={() => deleteMeal(item.id)}
-        accessibilityRole="button"
-        accessibilityLabel={`Usuń posiłek ${item.name}`}
-      >
-        <Text style={styles.deleteText}>×</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const listHeader = (
+  const renderFoodsHeader = () => (
     <View>
-      <Text style={styles.title}>Twoje posiłki</Text>
       <View style={styles.topButtons}>
         <TouchableOpacity style={styles.smallBtn} onPress={sortMeals}>
           <Text style={styles.smallBtnText}>Sortuj kcal</Text>
@@ -466,12 +696,12 @@ export default function Meals() {
         <View style={styles.row}>
           <Text style={styles.label}>Cel kcal:</Text>
           <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
+            style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: palette.card100 }]}
             keyboardType="numeric"
             value={targetCalories}
             onChangeText={setTargetCalories}
             placeholder="np. 2000"
-            placeholderTextColor={placeholderColor}
+            placeholderTextColor={palette.subText}
           />
         </View>
         <View style={styles.row}>
@@ -479,53 +709,33 @@ export default function Meals() {
             style={[styles.toggle, filterVegetarian ? styles.toggleOn : null]}
             onPress={() => setFilterVegetarian((prev) => !prev)}
           >
-            <Text
-              style={[
-                styles.toggleText,
-                filterVegetarian ? styles.toggleTextOn : null,
-              ]}
-            >
-              Wegetariańska
-            </Text>
+            <Text style={[styles.toggleText, filterVegetarian ? styles.toggleTextOn : null]}>Wegetariańska</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggle, filterGlutenFree ? styles.toggleOn : null]}
             onPress={() => setFilterGlutenFree((prev) => !prev)}
           >
-            <Text
-              style={[
-                styles.toggleText,
-                filterGlutenFree ? styles.toggleTextOn : null,
-              ]}
-            >
-              Bez glutenu
-            </Text>
+            <Text style={[styles.toggleText, filterGlutenFree ? styles.toggleTextOn : null]}>Bez glutenu</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggle, styles.toggleLast, filterLactoseFree ? styles.toggleOn : null]}
             onPress={() => setFilterLactoseFree((prev) => !prev)}
           >
-            <Text
-              style={[
-                styles.toggleText,
-                filterLactoseFree ? styles.toggleTextOn : null,
-              ]}
-            >
-              Bez laktozy
-            </Text>
+            <Text style={[styles.toggleText, filterLactoseFree ? styles.toggleTextOn : null]}>Bez laktozy</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Dostępne posiłki</Text>
+      <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 12 }]}>Dostępne posiłki</Text>
     </View>
   );
 
-  const listFooter = (
-    <View style={styles.footer}>
-      <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
+  const renderFoodsFooter = () => (
+    <View style={{ paddingBottom: 20 }}>
+      <TouchableOpacity style={styles.addButton} onPress={() => { resetFoodForm(); setFoodModalVisible(true); }}>
         <Text style={styles.addButtonText}>+ Dodaj posiłek</Text>
       </TouchableOpacity>
+
       <View style={styles.generatedBox}>
         <View style={styles.generatedHeader}>
           <Text style={styles.generatedTitle}>Wygenerowany jadłospis</Text>
@@ -538,8 +748,8 @@ export default function Meals() {
             <Text style={styles.summaryText}>
               Suma kalorii: {generatedPlan.reduce((sum, meal) => sum + (meal.calories || 0), 0)} kcal
             </Text>
-            {generatedPlan.map((meal) => (
-              <View key={meal.id} style={styles.generatedItem}>
+            {generatedPlan.map((meal, index) => (
+              <View key={`${meal.id}-${index}`} style={styles.generatedItem}>
                 <Text style={styles.mealName}>{meal.name}</Text>
                 <Text style={styles.mealInfo}>{meal.calories} kcal</Text>
               </View>
@@ -552,73 +762,151 @@ export default function Meals() {
     </View>
   );
 
+  const renderFoods = () => (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={foods}
+        keyExtractor={item => item.id}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+        ListHeaderComponent={renderFoodsHeader}
+        ListFooterComponent={renderFoodsFooter}
+        ListEmptyComponent={<Text style={styles.emptyText}>Brak własnych posiłków. Dodaj pierwszy!</Text>}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.cardSubtitle}>
+                {item.calories} kcal • B: {item.protein} • W: {item.carbs} • T: {item.fat}
+              </Text>
+            </View>
+            <View style={styles.actions}>
+              <TouchableOpacity onPress={() => openLogModal(item)} style={styles.actionBtn}>
+                <MaterialIcons name="add-circle-outline" size={24} color={palette.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openEditFood(item)} style={styles.actionBtn}>
+                <MaterialIcons name="edit" size={22} color={palette.subText} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDeleteFood(item.id)} style={styles.actionBtn}>
+                <MaterialIcons name="delete-outline" size={22} color={theme.colors.danger} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
-      <FlatList
-        data={meals}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMeal}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-        ListEmptyComponent={<Text style={styles.emptyList}>Brak posiłków spełniających filtry</Text>}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      />
-
-      <View style={styles.qrButton}>
-        <Pressable onPress={openScanner} accessibilityLabel="Zeskanuj produkt">
-          <MaterialIcons name="qr-code-scanner" size={32} color={palette.text} />
-        </Pressable>
+      <View style={styles.header}>
+        <Text style={styles.title}>Posiłki</Text>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'diary' && styles.activeTab]}
+            onPress={() => setActiveTab('diary')}
+          >
+            <Text style={[styles.tabText, activeTab === 'diary' && styles.activeTabText]}>Dziennik</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'foods' && styles.activeTab]}
+            onPress={() => setActiveTab('foods')}
+          >
+            <Text style={[styles.tabText, activeTab === 'foods' && styles.activeTabText]}>Baza Posiłków</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+      {loading ? (
+        <ActivityIndicator size="large" color={palette.primary} style={{ marginTop: 40 }} />
+      ) : (
+        activeTab === 'diary' ? renderDiary() : renderFoods()
+      )}
+
+      {/* Modal: Add/Edit Food */}
+      <Modal visible={foodModalVisible} transparent animationType="slide" onRequestClose={() => setFoodModalVisible(false)}>
         <View style={styles.modalBg}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Dodaj posiłek</Text>
+            <Text style={styles.modalTitle}>{editingFood ? 'Edytuj posiłek' : 'Nowy posiłek'}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nazwa posiłku"
-              placeholderTextColor={placeholderColor}
-              value={newMeal.name}
-              onChangeText={(text) => setNewMeal({ ...newMeal, name: text })}
+              placeholder="Nazwa"
+              placeholderTextColor={palette.subText}
+              value={foodForm.name}
+              onChangeText={t => setFoodForm(prev => ({ ...prev, name: t }))}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Kalorie"
-              placeholderTextColor={placeholderColor}
-              keyboardType="numeric"
-              value={newMeal.calories}
-              onChangeText={(text) => setNewMeal({ ...newMeal, calories: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Białko (g)"
-              placeholderTextColor={placeholderColor}
-              keyboardType="numeric"
-              value={newMeal.protein}
-              onChangeText={(text) => setNewMeal({ ...newMeal, protein: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Węglowodany (g)"
-              placeholderTextColor={placeholderColor}
-              keyboardType="numeric"
-              value={newMeal.carbs}
-              onChangeText={(text) => setNewMeal({ ...newMeal, carbs: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Tłuszcze (g)"
-              placeholderTextColor={placeholderColor}
-              keyboardType="numeric"
-              value={newMeal.fat}
-              onChangeText={(text) => setNewMeal({ ...newMeal, fat: text })}
-            />
-            <TouchableOpacity style={styles.saveBtn} onPress={addMeal}>
-              <Text style={styles.saveBtnText}>Zapisz</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Kcal"
+                placeholderTextColor={palette.subText}
+                keyboardType="numeric"
+                value={foodForm.calories}
+                onChangeText={t => setFoodForm(prev => ({ ...prev, calories: t }))}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Białko"
+                placeholderTextColor={palette.subText}
+                keyboardType="numeric"
+                value={foodForm.protein}
+                onChangeText={t => setFoodForm(prev => ({ ...prev, protein: t }))}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Węgle"
+                placeholderTextColor={palette.subText}
+                keyboardType="numeric"
+                value={foodForm.carbs}
+                onChangeText={t => setFoodForm(prev => ({ ...prev, carbs: t }))}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Tłuszcz"
+                placeholderTextColor={palette.subText}
+                keyboardType="numeric"
+                value={foodForm.fat}
+                onChangeText={t => setFoodForm(prev => ({ ...prev, fat: t }))}
+              />
+            </View>
+            <TouchableOpacity style={styles.btn} onPress={handleSaveFood}>
+              <Text style={styles.btnText}>Zapisz</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setFoodModalVisible(false)}>
+              <Text style={styles.cancelBtnText}>Anuluj</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Add to Diary */}
+      <Modal visible={logModalVisible} transparent animationType="fade" onRequestClose={() => setLogModalVisible(false)}>
+        <View style={styles.modalBg}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Dodaj do dziennika</Text>
+            <Text style={{ textAlign: 'center', marginBottom: 16, color: palette.text }}>
+              {selectedFoodForLog?.name}
+            </Text>
+
+            <View style={styles.typeSelector}>
+              {MEAL_TYPES.map(type => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[styles.typeBtn, selectedMealType === type.id && styles.typeBtnActive]}
+                  onPress={() => setSelectedMealType(type.id)}
+                >
+                  <Text style={[styles.typeBtnText, selectedMealType === type.id && styles.typeBtnTextActive]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.btn} onPress={handleAddToLog}>
+              <Text style={styles.btnText}>Dodaj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setLogModalVisible(false)}>
               <Text style={styles.cancelBtnText}>Anuluj</Text>
             </TouchableOpacity>
           </View>
