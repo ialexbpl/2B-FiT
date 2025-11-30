@@ -30,27 +30,86 @@ export const AI: React.FC = () => {
   const [input, setInput] = useState('');
 
   // Encoding NOTE: fix mojibake below; e.g. 'Cześć! Jak mogę Ci dziś pomóc? 🙂'
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'm1', author: 'ai', text: 'Cześć! Jak mogę Ci dziś pomóc? 🙂', time: '6:50 pm' },
-    { id: 'm2', author: 'user', text: 'Pokaż mi podsumowanie treningów z tygodnia.', time: '6:53 pm' },
-    { id: 'm3', author: 'ai', text: 'Jasne! Chcesz zobaczyć to w formie wykresu?', time: '6:55 pm' },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Correct: nullable ref with optional chaining on usage
   const scrollRef = useRef<ScrollView | null>(null);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    const newMsg: ChatMessage = {
+
+    const userText = input.trim();
+    const userMsg: ChatMessage = {
       id: String(Date.now()),
       author: 'user',
-      text: input.trim(),
+      text: userText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages(prev => [...prev, newMsg]);
+
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
-    // Works fine; an alternative is a useEffect that scrolls when messages.length changes
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+
+    // Add temporary loading message
+    const loadingId = 'loading-' + Date.now();
+    setMessages(prev => [
+      ...prev,
+      { id: loadingId, author: 'ai', text: 'Myślę...', time: '' }
+    ]);
+
+    try {
+      // Try multiple endpoints in order
+      const endpoints = [
+        'http://192.168.1.104:8000/chat', // LAN IP (Physical Device)
+        'http://10.0.2.2:8000/chat',      // Android Emulator
+        'http://localhost:8000/chat'      // iOS Simulator
+      ];
+
+      let response;
+      let error;
+
+      for (const url of endpoints) {
+        try {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userText }),
+          });
+          if (response.ok) break; // Success!
+        } catch (e) {
+          error = e;
+          continue; // Try next endpoint
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw error || new Error('Failed to connect to any AI server endpoint');
+      }
+
+      const data = await response.json();
+
+      setMessages(prev => prev.map(msg =>
+        msg.id === loadingId
+          ? {
+            ...msg,
+            text: data.response,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+          : msg
+      ));
+
+    } catch (error) {
+      console.error('AI Error:', error);
+      setMessages(prev => prev.map(msg =>
+        msg.id === loadingId
+          ? {
+            ...msg,
+            text: 'Nie udało się połączyć z serwerem AI. Sprawdź czy okno "Python AI Server" jest otwarte na komputerze.',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+          : msg
+      ));
+    }
   };
 
   const handlePickImage = () => {
