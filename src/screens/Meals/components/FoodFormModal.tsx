@@ -37,10 +37,10 @@ export function FoodFormModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
       <View style={styles.modalBg}>
         <View style={styles.modal}>
-          <Text style={styles.modalTitle}>{editingFood ? "Edytuj posiek" : "Nowy posiek"}</Text>
+          <Text style={styles.modalTitle}>{editingFood ? "Edit meal" : "New meal"}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Nazwa"
+            placeholder="Name"
             placeholderTextColor={palette.subText}
             value={foodForm.name}
             onChangeText={(t) => onChange("name", t)}
@@ -56,7 +56,7 @@ export function FoodFormModal({
             />
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Biako"
+              placeholder="Protein"
               placeholderTextColor={palette.subText}
               keyboardType="numeric"
               value={foodForm.protein}
@@ -66,7 +66,7 @@ export function FoodFormModal({
           <View style={{ flexDirection: "row", gap: 10 }}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Wgle"
+              placeholder="Carbs"
               placeholderTextColor={palette.subText}
               keyboardType="numeric"
               value={foodForm.carbs}
@@ -74,7 +74,7 @@ export function FoodFormModal({
             />
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Tuszcz"
+              placeholder="Fat"
               placeholderTextColor={palette.subText}
               keyboardType="numeric"
               value={foodForm.fat}
@@ -86,26 +86,26 @@ export function FoodFormModal({
               style={[styles.flagBtn, foodForm.vegetarian && styles.flagBtnActive]}
               onPress={() => onChange("vegetarian", !foodForm.vegetarian)}
             >
-              <Text style={[styles.flagText, foodForm.vegetarian && styles.flagTextActive]}>Wegetarianskie</Text>
+              <Text style={[styles.flagText, foodForm.vegetarian && styles.flagTextActive]}>Vegetarian</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.flagBtn, foodForm.gluten_free && styles.flagBtnActive]}
               onPress={() => onChange("gluten_free", !foodForm.gluten_free)}
             >
-              <Text style={[styles.flagText, foodForm.gluten_free && styles.flagTextActive]}>Bez glutenu</Text>
+              <Text style={[styles.flagText, foodForm.gluten_free && styles.flagTextActive]}>Gluten-free</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.flagBtn, foodForm.lactose_free && styles.flagBtnActive]}
               onPress={() => onChange("lactose_free", !foodForm.lactose_free)}
             >
-              <Text style={[styles.flagText, foodForm.lactose_free && styles.flagTextActive]}>Bez laktozy</Text>
+              <Text style={[styles.flagText, foodForm.lactose_free && styles.flagTextActive]}>Lactose-free</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.btn} onPress={onSave}>
-            <Text style={styles.btnText}>Zapisz</Text>
+            <Text style={styles.btnText}>Save</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-            <Text style={styles.cancelBtnText}>Anuluj</Text>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>

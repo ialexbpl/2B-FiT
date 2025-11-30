@@ -40,10 +40,10 @@ export function DefaultFoodsModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBg}>
         <View style={[styles.modal, { maxHeight: "85%" }]}>
-          <Text style={styles.modalTitle}>Gotowe posilki</Text>
+          <Text style={styles.modalTitle}>Default meals</Text>
           <TextInput
             style={styles.input}
-            placeholder="Szukaj..."
+            placeholder="Search..."
             placeholderTextColor={palette.subText}
             value={search}
             onChangeText={onSearchChange}
@@ -53,19 +53,19 @@ export function DefaultFoodsModal({
               style={[styles.flagBtn, filterVeg && styles.flagBtnActive]}
               onPress={onToggleVeg}
             >
-              <Text style={[styles.flagText, filterVeg && styles.flagTextActive]}>Wegetarianskie</Text>
+              <Text style={[styles.flagText, filterVeg && styles.flagTextActive]}>Vegetarian</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.flagBtn, filterGlutenFree && styles.flagBtnActive]}
               onPress={onToggleGluten}
             >
-              <Text style={[styles.flagText, filterGlutenFree && styles.flagTextActive]}>Bez glutenu</Text>
+              <Text style={[styles.flagText, filterGlutenFree && styles.flagTextActive]}>Gluten-free</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.flagBtn, filterLactoseFree && styles.flagBtnActive]}
               onPress={onToggleLactose}
             >
-              <Text style={[styles.flagText, filterLactoseFree && styles.flagTextActive]}>Bez laktozy</Text>
+              <Text style={[styles.flagText, filterLactoseFree && styles.flagTextActive]}>Lactose-free</Text>
             </TouchableOpacity>
           </View>
 
@@ -75,23 +75,23 @@ export function DefaultFoodsModal({
                 <View style={styles.defaultCardHeader}>
                   <Text style={styles.defaultCardTitle}>{food.name}</Text>
                   <TouchableOpacity style={styles.defaultAddBtn} onPress={() => onAdd(food)}>
-                    <Text style={styles.defaultAddBtnText}>Dodaj</Text>
+                    <Text style={styles.defaultAddBtnText}>Add</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.cardSubtitle}>
-                  {food.calories} kcal | B: {food.protein} | W: {food.carbs} | T: {food.fat}
+                  {food.calories} kcal | P: {food.protein} | C: {food.carbs} | F: {food.fat}
                 </Text>
                 <View style={styles.defaultTags}>
-                  {food.vegetarian && <Text style={styles.tag}>Wege</Text>}
-                  {food.gluten_free && <Text style={styles.tag}>Bez glutenu</Text>}
-                  {food.lactose_free && <Text style={styles.tag}>Bez laktozy</Text>}
+                  {food.vegetarian && <Text style={styles.tag}>Veg</Text>}
+                  {food.gluten_free && <Text style={styles.tag}>Gluten-free</Text>}
+                  {food.lactose_free && <Text style={styles.tag}>Lactose-free</Text>}
                 </View>
               </View>
             ))}
           </ScrollView>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelBtnText}>Zamknij</Text>
+            <Text style={styles.cancelBtnText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>

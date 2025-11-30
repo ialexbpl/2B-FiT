@@ -3,7 +3,7 @@
 // - Consider removing unused imports (e.g., Text) to keep the bundle tidy.
 // - Keep useMemo usage consistent: either import { useMemo } and call useMemo(...)
 //   or call React.useMemo(...) and drop it from the named import.
-// - Seed messages contain mojibake (encoding issue). Replace with proper UTF‑8 strings.
+// - Seed messages contain mojibake (encoding issue). Replace with proper UTF-8 strings.
 // - The nullable ref type and optional chaining are correct for ScrollView refs.
 
 import React, { useMemo, useRef, useState } from 'react';
@@ -24,12 +24,12 @@ export type ChatMessage = {
 export const AI: React.FC = () => {
   const { palette, theme } = useTheme();
 
-  // Consistency tip: either use `useMemo` (imported) or `React.useMemo` — not both.
+  // Consistency tip: either use `useMemo` (imported) or `React.useMemo` - not both.
   const styles = useMemo(() => makeAIStyles(palette, theme), [palette, theme]);
 
   const [input, setInput] = useState('');
 
-  // Encoding NOTE: fix mojibake below; e.g. 'Cześć! Jak mogę Ci dziś pomóc? 🙂'
+  // Encoding NOTE: fix mojibake below; e.g. 'Hello! How can I help you today?'
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Correct: nullable ref with optional chaining on usage
@@ -54,7 +54,7 @@ export const AI: React.FC = () => {
     const loadingId = 'loading-' + Date.now();
     setMessages(prev => [
       ...prev,
-      { id: loadingId, author: 'ai', text: 'Myślę...', time: '' }
+      { id: loadingId, author: 'ai', text: 'Thinking...', time: '' }
     ]);
 
     try {
@@ -104,7 +104,7 @@ export const AI: React.FC = () => {
         msg.id === loadingId
           ? {
             ...msg,
-            text: 'Nie udało się połączyć z serwerem AI. Sprawdź czy okno "Python AI Server" jest otwarte na komputerze.',
+            text: 'Could not connect to the AI server. Make sure the "Python AI Server" window is open on your computer.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
           : msg

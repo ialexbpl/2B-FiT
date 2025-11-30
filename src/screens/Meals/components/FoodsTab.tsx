@@ -59,7 +59,7 @@ export function FoodsTab({
     <View>
       <View style={styles.topButtons}>
         <TouchableOpacity style={styles.smallBtn} onPress={sortMeals}>
-          <Text style={styles.smallBtnText}>Sortuj kcal</Text>
+          <Text style={styles.smallBtnText}>Sort by kcal</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.smallBtn} onPress={resetMeals}>
           <Text style={styles.smallBtnText}>Reset</Text>
@@ -68,20 +68,20 @@ export function FoodsTab({
           style={[styles.smallBtn, styles.smallBtnLast, styles.smallBtnAccent]}
           onPress={onGenerate}
         >
-          <Text style={[styles.smallBtnText, styles.smallBtnAccentText]}>Generuj jadospis</Text>
+          <Text style={[styles.smallBtnText, styles.smallBtnAccentText]}>Generate meal plan</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.generatorBox}>
-        <Text style={styles.generatorTitle}>Ustawienia generatora</Text>
+        <Text style={styles.generatorTitle}>Plan generator</Text>
         <View style={styles.row}>
-          <Text style={styles.label}>Cel kcal:</Text>
+          <Text style={styles.label}>Target kcal:</Text>
           <TextInput
             style={[styles.input, { flex: 1, marginBottom: 0 }]}
             keyboardType="numeric"
             value={targetCalories}
             onChangeText={setTargetCalories}
-            placeholder="np. 2000"
+            placeholder="e.g. 2000"
             placeholderTextColor={palette.subText}
           />
         </View>
@@ -90,48 +90,48 @@ export function FoodsTab({
             style={[styles.toggle, filterVegetarian ? styles.toggleOn : null]}
             onPress={() => setFilterVegetarian(!filterVegetarian)}
           >
-            <Text style={[styles.toggleText, filterVegetarian ? styles.toggleTextOn : null]}>Wegetariaska</Text>
+            <Text style={[styles.toggleText, filterVegetarian ? styles.toggleTextOn : null]}>Vegetarian</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggle, filterGlutenFree ? styles.toggleOn : null]}
             onPress={() => setFilterGlutenFree(!filterGlutenFree)}
           >
-            <Text style={[styles.toggleText, filterGlutenFree ? styles.toggleTextOn : null]}>Bez glutenu</Text>
+            <Text style={[styles.toggleText, filterGlutenFree ? styles.toggleTextOn : null]}>Gluten-free</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggle, styles.toggleLast, filterLactoseFree ? styles.toggleOn : null]}
             onPress={() => setFilterLactoseFree(!filterLactoseFree)}
           >
-            <Text style={[styles.toggleText, filterLactoseFree ? styles.toggleTextOn : null]}>Bez laktozy</Text>
+            <Text style={[styles.toggleText, filterLactoseFree ? styles.toggleTextOn : null]}>Lactose-free</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <TouchableOpacity style={styles.addDefaultBtn} onPress={onOpenDefaultModal}>
-        <Text style={styles.addDefaultBtnText}>Dodaj gotowe posilki</Text>
+        <Text style={styles.addDefaultBtnText}>Add default meals</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 12 }]}>Dostpne posiki</Text>
+      <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 12 }]}>Available meals</Text>
     </View>
   );
 
   const renderFoodsFooter = () => (
     <View style={{ paddingBottom: 20 }}>
       <TouchableOpacity style={styles.addButton} onPress={onAddFoodPress}>
-        <Text style={styles.addButtonText}>+ Dodaj posiek</Text>
+        <Text style={styles.addButtonText}>+ Add meal</Text>
       </TouchableOpacity>
 
       <View style={styles.generatedBox}>
         <View style={styles.generatedHeader}>
-          <Text style={styles.generatedTitle}>Wygenerowany jadospis</Text>
+          <Text style={styles.generatedTitle}>Generated plan</Text>
           <TouchableOpacity onPress={onClearPlan}>
-            <Text style={styles.clearGenerated}>Wyczy</Text>
+            <Text style={styles.clearGenerated}>Clear</Text>
           </TouchableOpacity>
         </View>
         {generatedPlan && generatedPlan.length > 0 ? (
           <>
             <Text style={styles.summaryText}>
-              Suma kalorii: {generatedPlan.reduce((sum, meal) => sum + (meal.calories || 0), 0)} kcal
+              Total calories: {generatedPlan.reduce((sum, meal) => sum + (meal.calories || 0), 0)} kcal
             </Text>
             {generatedPlan.map((meal, index) => (
               <View key={`${meal.id}-${index}`} style={styles.generatedItem}>
@@ -141,7 +141,7 @@ export function FoodsTab({
             ))}
           </>
         ) : (
-          <Text style={styles.muted}>Brak wygenerowanego planu</Text>
+          <Text style={styles.muted}>No plan generated yet</Text>
         )}
       </View>
     </View>
@@ -155,15 +155,15 @@ export function FoodsTab({
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
         ListHeaderComponent={renderFoodsHeader}
         ListFooterComponent={renderFoodsFooter}
-        ListEmptyComponent={<Text style={styles.emptyText}>Brak wasnych posikw. Dodaj pierwszy!</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No custom meals yet. Add one!</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardSubtitle}>
-                {item.calories} kcal | B: {item.protein} | W: {item.carbs} | T: {item.fat}
+                {item.calories} kcal | P: {item.protein} | C: {item.carbs} | F: {item.fat}
               </Text>
-              {isDefaultFood(item) && <Text style={styles.defaultBadge}>Domyslny</Text>}
+              {isDefaultFood(item) && <Text style={styles.defaultBadge}>Default</Text>}
             </View>
             <View style={styles.actions}>
               <TouchableOpacity onPress={() => onOpenLog(item)} style={styles.actionBtn}>

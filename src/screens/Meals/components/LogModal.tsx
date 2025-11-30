@@ -28,7 +28,7 @@ export function LogModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalBg}>
         <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Dodaj do dziennika</Text>
+          <Text style={styles.modalTitle}>Add to diary</Text>
           <Text style={{ textAlign: "center", marginBottom: 16 }}>
             {selectedFood?.name}
           </Text>
@@ -48,10 +48,10 @@ export function LogModal({
           </View>
 
           <TouchableOpacity style={styles.btn} onPress={onAdd}>
-            <Text style={styles.btnText}>Dodaj</Text>
+            <Text style={styles.btnText}>Add</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-            <Text style={styles.cancelBtnText}>Anuluj</Text>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>

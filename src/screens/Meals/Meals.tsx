@@ -122,7 +122,7 @@ export default function Meals() {
       <TouchableOpacity
         style={styles.scannerFab}
         onPress={() => navigation.navigate("Scanner" as never)}
-        accessibilityLabel="Skanuj produkt"
+        accessibilityLabel="Scan product"
       >
         <MaterialIcons name="qr-code-scanner" size={28} color={palette.onPrimary} />
       </TouchableOpacity>
