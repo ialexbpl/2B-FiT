@@ -16,10 +16,10 @@ import type { FoodItem, LogEntry, MealType } from "@models/MealModel";
 import { DEFAULT_FOODS } from "@constants/defaultFoods";
 
 export const MEAL_TYPES: { id: MealType; label: string }[] = [
-  { id: "breakfast", label: "niadanie" },
-  { id: "lunch", label: "Obiad" },
-  { id: "dinner", label: "Kolacja" },
-  { id: "snack", label: "Przekski" },
+  { id: "breakfast", label: "Breakfast" },
+  { id: "lunch", label: "Lunch" },
+  { id: "dinner", label: "Dinner" },
+  { id: "snack", label: "Snack" },
 ];
 
 export function useMealsLogic() {
@@ -76,7 +76,7 @@ export function useMealsLogic() {
       setFoods(fetchedFoods);
       setLogs(fetchedLogs);
     } catch (e) {
-      Alert.alert("Bd", "Nie udao si pobra danych.");
+      Alert.alert("Error", "Failed to load data.");
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,7 @@ export function useMealsLogic() {
   const handleSaveFood = async () => {
     if (!userId) return;
     if (!foodForm.name.trim()) {
-      Alert.alert("Bd", "Podaj nazw posiku.");
+      Alert.alert("Error", "Please enter a meal name.");
       return;
     }
 
@@ -124,41 +124,41 @@ export function useMealsLogic() {
     try {
       if (editingFood) {
         if (isDefaultFood(editingFood)) {
-          Alert.alert("Info", "Domylnych posikw nie mona edytowa.");
+          Alert.alert("Info", "Default meals cannot be edited.");
           return;
         }
         const updated = await updateUserFood(editingFood.id, payload);
         setFoods((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
-        Alert.alert("Sukces", "Posiek zaktualizowany.");
+        Alert.alert("Success", "Meal updated.");
       } else {
         const newFood = await addUserFood(userId, payload);
         setFoods((prev) => [...prev, newFood]);
-        Alert.alert("Sukces", "Posiek dodany.");
+        Alert.alert("Success", "Meal added.");
       }
       setFoodModalVisible(false);
       resetFoodForm();
     } catch (e) {
-      Alert.alert("Bd", "Nie udao si zapisa posiku.");
+      Alert.alert("Error", "Failed to save meal.");
     }
   };
 
   const handleDeleteFood = async (id: string) => {
     const foodToDelete = foods.find((f) => f.id === id);
     if (foodToDelete && isDefaultFood(foodToDelete)) {
-      Alert.alert("Info", "Domylnych posikw nie mona usuwa.");
+      Alert.alert("Info", "Default meals cannot be deleted.");
       return;
     }
-    Alert.alert("Usu", "Czy na pewno chcesz usun ten posiek?", [
-      { text: "Anuluj", style: "cancel" },
+    Alert.alert("Delete", "Delete this meal?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: "Usu",
+        text: "Delete",
         style: "destructive",
         onPress: async () => {
           try {
             await deleteUserFood(id);
             setFoods((prev) => prev.filter((f) => f.id !== id));
           } catch (e) {
-            Alert.alert("Bd", "Nie udao si usun.");
+            Alert.alert("Error", "Failed to delete.");
           }
         },
       },
@@ -167,7 +167,7 @@ export function useMealsLogic() {
 
   const openEditFood = (food: FoodItem) => {
     if (isDefaultFood(food)) {
-      Alert.alert("Info", "Domylne posiki s tylko do podgldu.");
+      Alert.alert("Info", "Default meals are read-only.");
       return;
     }
     setEditingFood(food);
@@ -188,7 +188,7 @@ export function useMealsLogic() {
     if (!userId) return;
     const exists = foods.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
     if (exists) {
-      Alert.alert("Info", "Masz juz ten posilek w bazie.");
+      Alert.alert("Info", "You already have this meal in your list.");
       return;
     }
     try {
@@ -203,9 +203,9 @@ export function useMealsLogic() {
         lactose_free: !!food.lactose_free,
       });
       setFoods((prev) => [...prev, newFood]);
-      Alert.alert("Dodano", "Posilek zostal dodany do dostepnych.");
+      Alert.alert("Added", "Meal added to your list.");
     } catch (e) {
-      Alert.alert("Blad", "Nie udalo sie dodac posilku.");
+      Alert.alert("Error", "Could not add meal.");
     }
   };
 
@@ -216,9 +216,9 @@ export function useMealsLogic() {
       const entry = await addToLog(userId, today, selectedMealType, selectedFoodForLog);
       setLogs((prev) => [...prev, entry]);
       setLogModalVisible(false);
-      Alert.alert("Dodano", `Dodano do: ${MEAL_TYPES.find((t) => t.id === selectedMealType)?.label}`);
+      Alert.alert("Added", `Added to: ${MEAL_TYPES.find((t) => t.id === selectedMealType)?.label}`);
     } catch (e) {
-      Alert.alert("Bd", "Nie udao si doda do dziennika.");
+      Alert.alert("Error", "Failed to add to diary.");
     }
   };
 
@@ -227,7 +227,7 @@ export function useMealsLogic() {
       await deleteLogEntry(id);
       setLogs((prev) => prev.filter((l) => l.id !== id));
     } catch (e) {
-      Alert.alert("Bd", "Nie udao si usun wpisu.");
+      Alert.alert("Error", "Failed to delete entry.");
     }
   };
 
@@ -250,7 +250,7 @@ export function useMealsLogic() {
   const generateMealPlan = () => {
     const target = Number(targetCalories) || 0;
     if (target <= 0) {
-      Alert.alert("Niepoprawny cel", "Podaj liczb kalorii wiksz od zera.");
+      Alert.alert("Invalid target", "Enter a calorie target greater than zero.");
       return;
     }
 
@@ -262,7 +262,7 @@ export function useMealsLogic() {
     let pool = foods.filter((f) => matchesRestrictions(f, reqs));
 
     if (pool.length === 0) {
-      Alert.alert("Brak dopasowa", "aden posiek nie spenia wybranych filtrw.");
+      Alert.alert("No matches", "No meals match the selected filters.");
       return;
     }
 

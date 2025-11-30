@@ -1,8 +1,8 @@
 // src/screens/AI/AIConversation.tsx
 // Notes:
-// - Prop type for scrollRef accepts nullable/mutable ref — compatible with useRef<ScrollView|null>(null).
+// - Prop type for scrollRef accepts nullable/mutable ref - compatible with useRef<ScrollView|null>(null).
 // - Added keyboardShouldPersistTaps for better UX with keyboard.
-// - Encoding NOTE: fix Polish strings in placeholders/accessibility labels (mojibake).
+// - Encoding NOTE: placeholders/accessibility labels are now English.
 // - Optional: Use a dedicated ai-avatar for AI messages (you already have ai-avatar.png).
 
 import React from 'react';
@@ -73,8 +73,7 @@ export const AIConversation: React.FC<Props> = ({
       <View style={styles.inputBar}>
         <Pressable
           onPress={onPickImage}
-          // Encoding NOTE: replace with proper UTF‑8, e.g. "Dodaj zdjęcie"
-          accessibilityLabel="Dodaj zdjęcie"
+          accessibilityLabel="Add photo"
           style={[styles.iconButton, styles.iconSecondary]}
         >
           <Ionicons name="camera" size={20} color={palette.subText} />
@@ -83,8 +82,7 @@ export const AIConversation: React.FC<Props> = ({
         <TextInput
           value={input}
           onChangeText={setInput}
-          // Encoding NOTE: replace with proper UTF‑8
-          placeholder="Hej w czym mogę ci dzisiaj pomóc"
+          placeholder="Hey, how can I help you today?"
           placeholderTextColor={palette.subText}
           style={styles.textInput}
           multiline
@@ -92,8 +90,7 @@ export const AIConversation: React.FC<Props> = ({
 
         <Pressable
           onPress={onSend}
-          // Encoding NOTE: replace with proper UTF‑8, e.g. "Wyślij wiadomość"
-          accessibilityLabel="Wyślij wiadomość"
+          accessibilityLabel="Send message"
           style={[styles.iconButton, styles.iconPrimary, disabled && { opacity: 0.6 }]}
           disabled={disabled}
         >

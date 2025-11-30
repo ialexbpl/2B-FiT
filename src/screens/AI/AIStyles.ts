@@ -2,7 +2,7 @@
 // Notes:
 // - `gap` is supported in newer RN versions; if you target older RN/Android, consider replacing
 //   with margins between children for broader compatibility.
-// - messagesScroll/messagesContent: this variant has no “card” surface; only content scrolls.
+// - messagesScroll/messagesContent: this variant has no "card" surface; only content scrolls.
 // - If you reintroduce a card, split styles: {conversation, card, messagesScroll} like earlier.
 
 import { StyleSheet } from 'react-native';

@@ -22,19 +22,19 @@ export function DiaryTab({ logs, mealTypes, onDeleteLog, onAddFromFoods, styles,
     <ScrollView style={{ flex: 1 }}>
       <View style={styles.summaryBox}>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Kalorie</Text>
+          <Text style={styles.summaryLabel}>Calories</Text>
           <Text style={styles.summaryValue}>{summary.calories} kcal</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Biako</Text>
+          <Text style={styles.summaryLabel}>Protein</Text>
           <Text style={styles.summaryValue}>{summary.protein} g</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Wglowodany</Text>
+          <Text style={styles.summaryLabel}>Carbs</Text>
           <Text style={styles.summaryValue}>{summary.carbs} g</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tuszcze</Text>
+          <Text style={styles.summaryLabel}>Fat</Text>
           <Text style={styles.summaryValue}>{summary.fat} g</Text>
         </View>
       </View>
@@ -51,7 +51,7 @@ export function DiaryTab({ logs, mealTypes, onDeleteLog, onAddFromFoods, styles,
             </View>
             {mealLogs.length === 0 ? (
               <Text style={[styles.emptyText, { marginTop: 0, marginBottom: 8, fontSize: 12 }]}>
-                Brak wpisw
+                No entries yet
               </Text>
             ) : (
               mealLogs.map((log) => (
@@ -59,7 +59,7 @@ export function DiaryTab({ logs, mealTypes, onDeleteLog, onAddFromFoods, styles,
                   <View style={styles.cardContent}>
                     <Text style={styles.cardTitle}>{log.food_name}</Text>
                     <Text style={styles.cardSubtitle}>
-                      {log.calories} kcal  B: {log.protein}  W: {log.carbs}  T: {log.fat}
+                      {log.calories} kcal  P: {log.protein}  C: {log.carbs}  F: {log.fat}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => onDeleteLog(log.id)} style={styles.actionBtn}>
@@ -72,7 +72,7 @@ export function DiaryTab({ logs, mealTypes, onDeleteLog, onAddFromFoods, styles,
               style={{ alignSelf: "center", padding: 8 }}
               onPress={onAddFromFoods}
             >
-              <Text style={{ color: palette.text, fontWeight: "600" }}>+ Dodaj produkt</Text>
+              <Text style={{ color: palette.text, fontWeight: "600" }}>+ Add from foods</Text>
             </TouchableOpacity>
           </View>
         );

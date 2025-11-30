@@ -194,7 +194,7 @@ export default function Scanner() {
               </Text>
             )}
 
-            {/* Ilość / opakowanie */}
+            {/* Quantity / package */}
             {product.quantity && (
               <Text style={styles.fullProductMeta}>
                 Quantity / package: {product.quantity}
@@ -214,7 +214,7 @@ export default function Scanner() {
             )}
 
 
-            {/* Makro na 100 g */}
+            {/* Macros per 100 g */}
             {(product.fatPer100g != null ||
               product.carbsPer100g != null ||
               product.proteinsPer100g != null ||
@@ -257,7 +257,7 @@ export default function Scanner() {
               </View>
             )}
 
-            {/* Skład */}
+            {/* Ingredients */}
             {product.ingredients && (
               <View style={styles.fullProductSection}>
                 <Text style={styles.fullProductSectionTitle}>Ingredients</Text>
@@ -267,7 +267,7 @@ export default function Scanner() {
               </View>
             )}
 
-            {/* Alergeny */}
+            {/* Allergens */}
             {product.allergens && (
               <View style={styles.fullProductSection}>
                 <Text style={styles.fullProductSectionTitle}>Allergens</Text>
@@ -295,19 +295,19 @@ export default function Scanner() {
         >
           <View style={styles.overlayWrapper}>
             <View style={styles.overlayCard}>
-              {/* Info o zeskanowanym kodzie */}
+              {/* Info about scanned code */}
               <Text style={styles.codeInfoText}>
                 {last
                   ? `Code: ${last.data} (${last.type})`
                   : "Point the camera at a barcode\nor\nsearch by product name."}
               </Text>
 
-              {/* Pasek wyszukiwania po nazwie */}
+              {/* Search bar by name */}
               <View style={styles.searchRow}>
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Type product name…"
+                  placeholder="Type product name..."
                   placeholderTextColor={palette.subText}
                   style={styles.searchInput}
                   returnKeyType="search"
@@ -321,17 +321,17 @@ export default function Scanner() {
                 </Pressable>
               </View>
 
-              {/* Status ładowania produktu */}
+              {/* Product loading status */}
               {loadingProduct && (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator size="small" />
                   <Text style={styles.loadingText}>
-                    Looking up the product…
+                    Looking up the product...
                   </Text>
                 </View>
               )}
 
-              {/* Błąd z API */}
+              {/* API error */}
               {productError && !loadingProduct && (
                 <Text style={styles.errorText}>{productError}</Text>
               )}
