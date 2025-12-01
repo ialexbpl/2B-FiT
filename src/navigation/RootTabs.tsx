@@ -10,6 +10,7 @@ import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
 import { Setting } from '@screens/Settings/Setting';
 import Scanner from '@screens/Meals/Scanner/Scanner';
+import UserProfileScreen from '@screens/Dashboard/community/UserProfileScreen';
 
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@utils/supabase';
@@ -197,6 +198,14 @@ export function RootTabs() {
         name="Scanner"
         component={Scanner}
         options={{ tabBarButton: () => null, headerShown: false }}
+      />
+      <Tab.Screen
+        name="UserProfileFeed"
+        component={UserProfileScreen}
+        options={{
+          tabBarButton: () => null,
+          headerShown: false,
+        }}
       />
     </Tab.Navigator>
   );

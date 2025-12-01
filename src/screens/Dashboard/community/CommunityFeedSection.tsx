@@ -8,6 +8,7 @@ import { usePosts } from '../../../hooks/usePosts';
 import { CreatePostModal } from './CreatePostModal';
 import { useAuth } from '@context/AuthContext';
 import { CommentsSheet } from './CommentsSheet';
+import { useNavigation } from '@react-navigation/native';
 
 type Props = {
   availableHeight: number;
@@ -21,6 +22,8 @@ export const CommunityFeedSection: React.FC<Props> = ({
   const { palette } = useTheme();
   const { profile } = useAuth();
   const { posts, loading, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
+  const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
+  const [filteredUsername, setFilteredUsername] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
       onEnablePagerView();
     }
   }, [onEnablePagerView]);
+  const navigation = useNavigation<any>();
 
   const convertToLegacyPost = (post: any) => ({
     id: post.id,
@@ -173,13 +177,16 @@ export const CommunityFeedSection: React.FC<Props> = ({
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={posts}
+        data={filteredUserId ? posts.filter(p => p.user_id === filteredUserId) : posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent
             post={convertToLegacyPost(item)}
             onLike={() => likePost(item.id)}
             onComment={handleComment}
+            onUserPress={(userId, username) => {
+              navigation.navigate('UserProfileFeed', { userId, username });
+            }}
           />
         )}
         refreshing={refreshing}
@@ -189,14 +196,23 @@ export const CommunityFeedSection: React.FC<Props> = ({
         ListHeaderComponent={
           <View style={styles.refreshHeader}>
             <Text style={styles.refreshText}>
-              Last refresh: {getTimeSinceLastRefresh()}
+              {filteredUserId
+                ? `Viewing ${filteredUsername || 'user'}`
+                : `Last refresh: ${getTimeSinceLastRefresh()}`}
             </Text>
             <TouchableOpacity 
               style={styles.refreshButton}
-              onPress={handleRefresh}
+              onPress={() => {
+                if (filteredUserId) {
+                  setFilteredUserId(null);
+                  setFilteredUsername(null);
+                } else {
+                  handleRefresh();
+                }
+              }}
             >
-              <Ionicons name="refresh" size={14} color={palette.primary} />
-              <Text style={styles.refreshButtonText}>Refresh</Text>
+              <Ionicons name={filteredUserId ? "close" : "refresh"} size={14} color={palette.primary} />
+              <Text style={styles.refreshButtonText}>{filteredUserId ? 'Clear' : 'Refresh'}</Text>
             </TouchableOpacity>
           </View>
         }

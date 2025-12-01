@@ -1,19 +1,12 @@
 // src/screens/AI/AI.tsx
-// Notes:
-// - Consider removing unused imports (e.g., Text) to keep the bundle tidy.
-// - Keep useMemo usage consistent: either import { useMemo } and call useMemo(...)
-//   or call React.useMemo(...) and drop it from the named import.
-// - Seed messages contain mojibake (encoding issue). Replace with proper UTF-8 strings.
-// - The nullable ref type and optional chaining are correct for ScrollView refs.
-
 import React, { useMemo, useRef, useState } from 'react';
-import { /* Text, */ ScrollView, KeyboardAvoidingView, Platform } from 'react-native'; // Text not used here
+import { /* Text, */ ScrollView, KeyboardAvoidingView, Platform, NativeModules } from 'react-native';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { makeAIStyles } from './AIStyles';
 import { AIConversation } from './AIConversation';
 
-// Exported to share the type with AIConversation
 export type ChatMessage = {
   id: string;
   author: 'user' | 'ai';
@@ -23,48 +16,59 @@ export type ChatMessage = {
 
 export const AI: React.FC = () => {
   const { palette, theme } = useTheme();
-
-  // Consistency tip: either use `useMemo` (imported) or `React.useMemo` - not both.
   const styles = useMemo(() => makeAIStyles(palette, theme), [palette, theme]);
 
   const [input, setInput] = useState('');
-
-  // Encoding NOTE: fix mojibake below; e.g. 'Hello! How can I help you today?'
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-
-  // Correct: nullable ref with optional chaining on usage
   const scrollRef = useRef<ScrollView | null>(null);
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
     const userText = input.trim();
+    const now = new Date();
+    const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: ChatMessage = {
       id: String(Date.now()),
       author: 'user',
       text: userText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: timeLabel,
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const baseMessages = [...messages, userMsg];
+    const loadingId = 'loading-' + Date.now();
+    const loadingMsg: ChatMessage = { id: loadingId, author: 'ai', text: 'Mysle...', time: '' };
+
+    setMessages([...baseMessages, loadingMsg]);
     setInput('');
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
 
-    // Add temporary loading message
-    const loadingId = 'loading-' + Date.now();
-    setMessages(prev => [
-      ...prev,
-      { id: loadingId, author: 'ai', text: 'Thinking...', time: '' }
-    ]);
+    const historyPayload = baseMessages.slice(-10).map(msg => ({
+      role: msg.author === 'user' ? 'user' : 'assistant',
+      content: msg.text,
+    }));
+
+    // Build endpoints dynamically: env override, then LAN from Metro host, then platform fallbacks
+    const scriptURL: string | undefined = (NativeModules as any)?.SourceCode?.scriptURL;
+    const bundlerHost = scriptURL ? scriptURL.split('://')[1]?.split(':')[0] : undefined;
+    const hostUri =
+      Constants.expoConfig?.hostUri ??
+      (Constants as any)?.manifest?.hostUri ??
+      (Constants as any)?.manifest?.debuggerHost;
+    const hostFromConfig = hostUri?.split(':')[0];
+    const host = bundlerHost || hostFromConfig;
+    const envBase = process.env.EXPO_PUBLIC_AI_BASE_URL?.replace(/\/+$/, ''); // e.g. http://192.168.x.x:8000
+    const lanBase = host ? `http://${host}:8000` : undefined;
+
+    const endpoints = [
+      envBase ? `${envBase}/chat` : undefined, // set EXPO_PUBLIC_AI_BASE_URL in .env for stable URL (LAN/tunnel)
+      lanBase ? `${lanBase}/chat` : undefined, // derived from Metro host (LAN)
+      'http://10.0.2.2:8000/chat', // Android emulator
+      'http://localhost:8000/chat' // iOS simulator
+    ].filter(Boolean) as string[];
+    console.log('[AI] endpoints to try:', endpoints);
 
     try {
-      // Try multiple endpoints in order
-      const endpoints = [
-        'http://192.168.1.104:8000/chat', // LAN IP (Physical Device)
-        'http://10.0.2.2:8000/chat',      // Android Emulator
-        'http://localhost:8000/chat'      // iOS Simulator
-      ];
-
       let response;
       let error;
 
@@ -73,12 +77,12 @@ export const AI: React.FC = () => {
           response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userText }),
+            body: JSON.stringify({ message: userText, history: historyPayload }),
           });
-          if (response.ok) break; // Success!
+          if (response.ok) break;
         } catch (e) {
           error = e;
-          continue; // Try next endpoint
+          continue;
         }
       }
 
@@ -104,7 +108,7 @@ export const AI: React.FC = () => {
         msg.id === loadingId
           ? {
             ...msg,
-            text: 'Could not connect to the AI server. Make sure the "Python AI Server" window is open on your computer.',
+            text: 'Nie udalo sie polaczyc z serwerem AI. Sprawdz czy okno "Python AI Server" jest otwarte na komputerze.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
           : msg
@@ -113,7 +117,6 @@ export const AI: React.FC = () => {
   };
 
   const handlePickImage = () => {
-    // Future: hook up Expo ImagePicker/Camera
     console.log('Open camera/gallery');
   };
 

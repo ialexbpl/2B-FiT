@@ -80,6 +80,7 @@ export const Profile: React.FC = () => {
     }
   }, [isSavingName]);
 
+
   const handleSaveName = React.useCallback(async () => {
     if (!session?.user?.id) {
       setNameError('You must be signed in.');
@@ -188,6 +189,7 @@ export const Profile: React.FC = () => {
       setIsUploadingAvatar(false);
     }
   }, [refreshProfile, session?.user?.id]);
+
 
   const highlightItems = React.useMemo(
     () => [
@@ -352,6 +354,7 @@ export const Profile: React.FC = () => {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 };

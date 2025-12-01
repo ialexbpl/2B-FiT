@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from typing import List, Literal, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -65,8 +66,14 @@ app = FastAPI(lifespan=lifespan)
 # -----------------------------
 # Models
 # -----------------------------
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
+    history: Optional[List[ChatTurn]] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -102,6 +109,14 @@ async def chat(request: ChatRequest):
     if not user_input:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    history_messages = []
+    if request.history:
+        history_messages = [
+            {"role": turn.role, "content": turn.content}
+            for turn in request.history
+            if turn.content.strip()
+        ]
+
     # 1. Search in Dataset
     results = search_similar_prompt(user_input, top_k=1)
     
@@ -118,7 +133,8 @@ async def chat(request: ChatRequest):
                 model="moonshotai/Kimi-K2-Instruct-0905",
                 messages=[
                     {"role": "system", "content": "Jesteś ekspertem ds. diety. Pomóż użytkownikowi zrozumieć wynik."},
-                    {"role": "user", "content": f"Użytkownik zapytał: {user_input}\nOdpowiedź z datasetu: {best_match['response']}\n\nWyjaśnij to prostym językiem i daj wskazówki praktyczne."}
+                    *history_messages,
+                    {"role": "user", "content": f"Użytkownik zapytał: {user_input}\nOdpowiedź z datasetu: {best_match['response']}\n\nWyjaśnij to prostym językiem i daj wskazówki praktyczne, nawiązując do wcześniejszych wiadomości."}
                 ],
             )
             ai_reply = completion.choices[0].message.content
@@ -135,6 +151,8 @@ async def chat(request: ChatRequest):
             completion = state["client"].chat.completions.create(
                 model="moonshotai/Kimi-K2-Instruct-0905",
                 messages=[
+                    {"role": "system", "content": "Jesteś ekspertem ds. diety. Odpowiadasz konkretnie i po polsku."},
+                    *history_messages,
                     {"role": "user", "content": user_input}
                 ],
             )

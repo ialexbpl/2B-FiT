@@ -52,6 +52,7 @@ export const FriendsPanel: React.FC = () => {
     acceptInvite,
     declineInvite,
     acknowledgeNotification,
+    removeFriend,
     isUserMutating,
     isFriendshipMutating,
     refresh,
@@ -123,6 +124,25 @@ export const FriendsPanel: React.FC = () => {
     [acceptInvite, declineInvite, safeAction]
   );
 
+  const confirmRemoveFriend = useCallback(
+    (friendshipId: string, displayName: string) => {
+      Alert.alert(
+        `Remove ${displayName}?`,
+        'They will be removed from your friends list.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => safeAction(() => removeFriend(friendshipId)),
+          },
+        ],
+        { cancelable: true }
+      );
+    },
+    [removeFriend, safeAction]
+  );
+
   const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
     <View style={styles.friendRow}>
       <Image
@@ -135,6 +155,17 @@ export const FriendsPanel: React.FC = () => {
           {resolveUsername(item.profile)} {item.since ? `• od ${formatDate(item.since)}` : ''}
         </Text>
       </View>
+      <TouchableOpacity
+        style={styles.friendGhostButton}
+        onPress={() => confirmRemoveFriend(item.friendshipId, resolveName(item.profile))}
+        disabled={isFriendshipMutating(item.friendshipId)}
+      >
+        {isFriendshipMutating(item.friendshipId) ? (
+          <ActivityIndicator size="small" color={palette.subText} />
+        ) : (
+          <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 
