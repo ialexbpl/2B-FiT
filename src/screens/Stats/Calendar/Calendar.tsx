@@ -11,12 +11,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import moment from 'moment';
 import 'moment/locale/en-gb';
 import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
+import * as Notifications from 'expo-notifications';
 
 import { useTheme } from '../../../context/ThemeContext';
 import { theme } from '../../../styles/theme';
@@ -31,12 +33,15 @@ type ActivityType = 'workout' | 'meal' | 'other';
 
 type CalendarEvent = {
   id: string;
-  dateKey: string;        // 'YYYY-MM-DD'
+  dateKey: string;
   type: ActivityType;
-  start: string;          // 'HH:MM'
-  end: string;            // 'HH:MM'
+  start: string;
+  end: string;
   description: string;
+  notificationId?: string;
+  reminderOffsetMin?: number;
 };
+
 
 const TYPE_COLORS: Record<ActivityType, string> = {
   workout: '#22c55e',
@@ -59,6 +64,24 @@ const fromMinutes = (mins: number) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
+const buildDateTime = (dateKey: string, hhmm: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const [h, m] = hhmm.split(':').map(Number);
+  return new Date(year, (month ?? 1) - 1, day ?? 1, h ?? 0, m ?? 0, 0, 0);
+};
+
+const ensureNotificationPermission = async () => {
+  const { status, granted } = await Notifications.getPermissionsAsync();
+
+  if (granted || status === Notifications.PermissionStatus.GRANTED) {
+    return true;
+  }
+
+  const req = await Notifications.requestPermissionsAsync();
+  return req.granted || req.status === Notifications.PermissionStatus.GRANTED;
+};
+
+
 export default function Calendar() {
   const carouselRef = React.useRef<ICarouselInstance>(null);
 
@@ -76,6 +99,9 @@ export default function Calendar() {
   const [formDesc, setFormDesc] = React.useState('');
   const [formError, setFormError] = React.useState<string | null>(null);
   const DESC_MAX = 140;
+
+  const [formReminderOn, setFormReminderOn] = React.useState(true);
+  const [formReminderOffset, setFormReminderOffset] = React.useState(1);
 
   // === EVENTS STATE (in-memory) ===
   const [events, setEvents] = React.useState<CalendarEvent[]>([]);
@@ -165,6 +191,8 @@ export default function Calendar() {
     setFormEnd(end);
     setFormDesc('');
     setFormError(null);
+    setFormReminderOn(true);
+    setFormReminderOffset(1);
     setModalVisible(true);
   }, []);
 
@@ -191,37 +219,127 @@ export default function Calendar() {
     setFormEnd(newEnd);
   }, [formStart]);
 
-  const onSave = React.useCallback(() => {
-    if (!isHHMM(formStart) || !isHHMM(formEnd)) {
-      setFormError('Use format HH:MM (e.g., 08:30).');
-      return;
-    }
-    if (toMinutes(formEnd) <= toMinutes(formStart)) {
-      setFormError('End time must be later than start time.');
-      return;
-    }
-    if (!formDesc.trim()) {
-      setFormError('Add a short description.');
-      return;
-    }
+const onSave = React.useCallback(async () => {
+  if (!isHHMM(formStart) || !isHHMM(formEnd)) {
+    setFormError('Use format HH:MM (e.g., 08:30).');
+    return;
+  }
+  if (toMinutes(formEnd) <= toMinutes(formStart)) {
+    setFormError('End time must be later than start time.');
+    return;
+  }
+  if (!formDesc.trim()) {
+    setFormError('Add a short description.');
+    return;
+  }
 
-    const newEvent: CalendarEvent = {
-      id: `${Date.now()}`,
-      dateKey: selectedDateKey,
-      type: formType,
-      start: formStart,
-      end: formEnd,
-      description: formDesc.trim(),
-    };
+  let notificationId: string | undefined;
 
-    setEvents(prev => [...prev, newEvent]);
-    setModalVisible(false);
-  }, [formDesc, formEnd, formStart, formType, selectedDateKey]);
+  // === PLANOWANIE POWIADOMIENIA ===
+  if (formReminderOn) {
+    const allowed = await ensureNotificationPermission();
+    if (!allowed) {
+      Alert.alert(
+        'Notifications disabled',
+        'You can enable notifications for 2B FiT in system settings.'
+      );
+    } else {
+      const startDate = buildDateTime(selectedDateKey, formStart);
+
+      // --- DO TESTÓW: 1 Minuta przed startem ---
+      const REMINDER_OFFSET_MIN = 1;
+      const reminderDate = new Date(
+        startDate.getTime() - REMINDER_OFFSET_MIN * 60 * 1000
+      );
+
+      const now = new Date();
+      const diffSeconds = Math.max(1, Math.floor((reminderDate.getTime() - now.getTime()) / 1000));
+
+      // jeśli powiadomienie w przeszłości lub za 5 sekund, to nie planuj
+      if (reminderDate.getTime() <= now.getTime() + 5000) {
+        console.log(
+          '[Calendar] Reminder time already passed or is too soon, skipping schedule'
+        );
+        console.log(
+          '[Calendar] Now:',
+          new Date().toISOString()
+        );
+      } else {
+        try {
+
+          notificationId = await Notifications.scheduleNotificationAsync({
+            content: {
+              title: typeLabel(formType),
+              body: formDesc.trim() || `${formStart} – ${formEnd}`,
+              data: {
+                dateKey: selectedDateKey,
+                start: formStart,
+                end: formEnd,
+                type: formType,
+              },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: diffSeconds,
+            },
+          });
+
+          console.log(
+            '[Calendar] Scheduled notification',
+            notificationId,
+            'at',
+            reminderDate.toISOString()
+          );
+          console.log(
+            '[Calendar] Now:',
+            new Date().toISOString()
+          );
+          console.log('[Calendar] (in seconds):', diffSeconds);
+        } catch (e) {
+          console.warn('Failed to schedule notification', e);
+        }
+      }
+    }
+  }
+
+  const newEvent: CalendarEvent = {
+    id: `${Date.now()}`,
+    dateKey: selectedDateKey,
+    type: formType,
+    start: formStart,
+    end: formEnd,
+    description: formDesc.trim(),
+    notificationId,
+    reminderOffsetMin: formReminderOn ? 1 : undefined,
+  };
+
+  setEvents(prev => [...prev, newEvent]);
+  setModalVisible(false);
+}, [
+  formDesc,
+  formEnd,
+  formStart,
+  formType,
+  formReminderOn,
+  selectedDateKey,
+]);
+
+
+
 
   // === DELETE HANDLERS ===
   const deleteEvent = React.useCallback((id: string) => {
-    setEvents(prev => prev.filter(e => e.id !== id));
+    setEvents(prev => {
+      const target = prev.find(e => e.id === id);
+      if (target?.notificationId) {
+        Notifications.cancelScheduledNotificationAsync(target.notificationId).catch(
+          (e) => console.warn('Failed to cancel notification', e)
+        );
+      }
+      return prev.filter(e => e.id !== id);
+    });
   }, []);
+
 
   const confirmDelete = React.useCallback((id: string) => {
     Alert.alert(
@@ -417,6 +535,21 @@ export default function Calendar() {
                       </Text>
                     </View>
                   )}
+                </View>
+
+                <View style={styles.reminderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reminderLabel}>Reminder</Text>
+                    <Text style={styles.reminderHint}>
+                      Notify me {formReminderOffset} minutes before start
+                    </Text>
+                  </View>
+                  <Switch
+                    value={formReminderOn}
+                    onValueChange={setFormReminderOn}
+                    thumbColor={formReminderOn ? palette.primary : palette.border}
+                    trackColor={{ false: palette.border, true: palette.primary }}
+                  />
                 </View>
 
                 <View style={styles.field}>
