@@ -104,6 +104,28 @@ export const makeDashboardStyles = (palette: Palette, tokens = theme) =>
             fontWeight: '700',
             color: palette.text,
         },
+        ringContainer: {
+            width: 90,
+            height: 90,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        ringBase: {
+            position: 'absolute',
+        },
+        ringHalfWrapper: {
+            position: 'absolute',
+            overflow: 'hidden',
+        },
+        ringHalfCircle: {
+            position: 'absolute',
+            borderRadius: 999,
+        },
+        ringCenter: {
+            position: 'absolute',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
 
         stepsTextContainer: {
             alignItems: 'center',
@@ -117,6 +139,16 @@ export const makeDashboardStyles = (palette: Palette, tokens = theme) =>
             fontSize: 12,
             color: palette.subText,
             marginTop: 2,
+        },
+        stepsEditButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        stepsEditText: {
+            marginLeft: 6,
+            color: palette.primary,
+            fontWeight: '600',
+            fontSize: 12,
         },
 
         weightMain: {

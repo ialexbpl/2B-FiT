@@ -10,9 +10,10 @@ type PostComponentProps = {
   onLike: (postId: string) => void;
   onComment: (postId: string) => void;
   onDelete?: (postId: string) => void;
+  onUserPress?: (userId: string, username?: string | null) => void;
 };
 
-export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment, onDelete }) => {
+export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment, onDelete, onUserPress }) => {
   const { palette } = useTheme();
   const commentCount = post.commentsCount ?? post.comments?.length ?? 0;
 
@@ -153,19 +154,23 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
     <View style={styles.container}>
       {/* Post Header */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          {post.user.avatar ? (
-            <Image source={{ uri: post.user.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-          ) : (
-            <Ionicons name="person" size={20} color={palette.subText} />
-          )}
-        </View>
+        <TouchableOpacity onPress={() => onUserPress?.(post.user.id, post.user.username)} activeOpacity={0.8}>
+          <View style={styles.avatar}>
+            {post.user.avatar ? (
+              <Image source={{ uri: post.user.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+            ) : (
+              <Ionicons name="person" size={20} color={palette.subText} />
+            )}
+          </View>
+        </TouchableOpacity>
         
         <View style={styles.userInfo}>
           <View style={styles.usernameRow}>
-            <Text style={styles.username}>
-              {post.user.username}
-            </Text>
+            <TouchableOpacity onPress={() => onUserPress?.(post.user.id, post.user.username)} activeOpacity={0.8}>
+              <Text style={styles.username}>
+                {post.user.username}
+              </Text>
+            </TouchableOpacity>
             {post.user.isVerified && (
               <Ionicons name="checkmark-circle" size={14} color={palette.primary} />
             )}

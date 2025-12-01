@@ -29,12 +29,14 @@ export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { session } = useAuth();
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchPosts = useCallback(async () => {
     try {
       console.log('Fetching posts...');
+      setErrorMessage(null);
 
       if (!session?.user?.id) {
         console.log('No user session, setting empty posts');
@@ -71,7 +73,9 @@ export const usePosts = () => {
       console.log(`Loaded ${postsWithLikes.length} posts`);
       setPosts(postsWithLikes);
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.warn('Error fetching posts:', error);
+      setErrorMessage('Network request failed. Check your connection and Supabase URL.');
+      setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -249,6 +253,7 @@ export const usePosts = () => {
     likePost,
     deletePost,
     adjustCommentCount,
+    error: errorMessage,
     refetch: manualRefresh, // manual refresh
     // interval-based auto-refresh; keep API surface for compatibility
     startAutoRefresh: () => {},

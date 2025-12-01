@@ -1,6 +1,8 @@
 import { useAuth } from '@context/AuthContext';
 import { supabase } from '@utils/supabase';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 export type FriendProfileSummary = {
   id: string;
@@ -69,6 +71,14 @@ export const useFriends = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [mutatingKeys, setMutatingKeys] = useState<Record<MutationKey, true>>({});
+  const notifications = useMemo(() => {
+    try {
+      return require('expo-notifications') as typeof import('expo-notifications');
+    } catch {
+      return null;
+    }
+  }, []);
+  const notifiedInvitesRef = useRef<Set<string>>(new Set());
 
   const setMutating = useCallback((key: MutationKey, value: boolean) => {
     setMutatingKeys(prev => {
@@ -172,6 +182,20 @@ export const useFriends = () => {
   const refresh = useCallback(async () => {
     await Promise.all([fetchRelationships(), fetchProfiles(debouncedQuery)]);
   }, [debouncedQuery, fetchProfiles, fetchRelationships]);
+  const invitesCacheKey = userId ? `friends:notified:${userId}` : null;
+
+  const ensureNotificationPermission = useCallback(async () => {
+    if (!notifications) return false;
+    try {
+      const { status, granted } = await notifications.getPermissionsAsync();
+      if (granted || status === notifications.PermissionStatus.GRANTED) return true;
+      const req = await notifications.requestPermissionsAsync();
+      return req.granted || req.status === notifications.PermissionStatus.GRANTED;
+    } catch (e) {
+      console.warn('Friends notification permission failed', e);
+      return false;
+    }
+  }, [notifications]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -192,8 +216,62 @@ export const useFriends = () => {
     if (!userId) {
       setRelationships([]);
       setRawCandidates([]);
+      notifiedInvitesRef.current.clear();
     }
   }, [userId]);
+
+  useEffect(() => {
+    const loadNotified = async () => {
+      if (!invitesCacheKey) return;
+      try {
+        const saved = await AsyncStorage.getItem(invitesCacheKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            notifiedInvitesRef.current = new Set(parsed);
+          }
+        }
+      } catch {
+        notifiedInvitesRef.current = new Set();
+      }
+    };
+    loadNotified();
+  }, [invitesCacheKey]);
+
+  useEffect(() => {
+    const notifyNewInvites = async () => {
+      if (!notifications || !userId || !invitesCacheKey) return;
+      const incoming = relationships.filter(
+        row => row.status === 'pending' && row.addressee_id === userId
+      );
+      const unseen = incoming.filter(row => !notifiedInvitesRef.current.has(row.id));
+      if (unseen.length === 0) return;
+
+      const allowed = await ensureNotificationPermission();
+      if (!allowed) return;
+
+      const first = unseen[0];
+      const otherId = first.requester_id;
+      const requesterProfile = first.requester ?? fallbackProfile(otherId);
+
+      try {
+        await notifications.scheduleNotificationAsync({
+          content: {
+            title: 'New friend invite',
+            body: `${requesterProfile.full_name || requesterProfile.username || 'Someone'} sent you a request.`,
+            data: { type: 'friend-invite', friendshipId: first.id, from: otherId },
+          },
+          trigger: null,
+        });
+      } catch (e) {
+        console.warn('Failed to schedule friend invite notification', e);
+      }
+
+      unseen.forEach(invite => notifiedInvitesRef.current.add(invite.id));
+      await AsyncStorage.setItem(invitesCacheKey, JSON.stringify([...notifiedInvitesRef.current]));
+    };
+    notifyNewInvites();
+  }, [ensureNotificationPermission, invitesCacheKey, notifications, relationships, userId]);
 
   const relationLookup = useMemo(() => {
     const map = new Map<string, RelationLookupEntry>();
@@ -397,6 +475,25 @@ export const useFriends = () => {
     [fetchRelationships, setMutating, userId]
   );
 
+  const removeFriend = useCallback(
+    async (friendshipId: string) => {
+      if (!userId) throw new Error('You must be signed in to remove friends.');
+      setMutating(`friendship:${friendshipId}`, true);
+      try {
+        const { error } = await supabase
+          .from('friendships')
+          .delete()
+          .eq('id', friendshipId)
+          .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+        if (error) throw error;
+        await fetchRelationships();
+      } finally {
+        setMutating(`friendship:${friendshipId}`, false);
+      }
+    },
+    [fetchRelationships, setMutating, userId]
+  );
+
   return {
     searchQuery,
     setSearchQuery,
@@ -412,6 +509,7 @@ export const useFriends = () => {
     acceptInvite,
     declineInvite,
     acknowledgeNotification,
+    removeFriend,
     isUserMutating,
     isFriendshipMutating,
     refresh,
