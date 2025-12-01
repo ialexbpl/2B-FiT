@@ -48,7 +48,7 @@ export const DashboardHome: React.FC = () => {
       const result = await fetchGyms(query);
       setGyms(result);
     } catch (error) {
-      console.error("Błąd podczas ładowania siłowni:", error);
+      console.error("Error while loading gyms:", error);
     } finally {
       setLoading(false);
     }
@@ -62,11 +62,10 @@ export const DashboardHome: React.FC = () => {
   }, [searchQuery, loadGyms]);
   
   const handleGymPress = (gym: Gym) => {
-   
     setActiveView({ type: 'DETAILS', gymId: gym.id });
   };
   
-  // Funkcja do powrotu z ekranu szczegółów
+  // Function to return from the details screen
   const handleCloseDetails = () => {
     setActiveView({ type: 'WIDGETS_OR_LIST' });
   };
@@ -97,7 +96,7 @@ export const DashboardHome: React.FC = () => {
     if (gyms.length === 0 && searchQuery.length > 2) {
       return (
         <Text style={[localStyles.noResultsText, { color: palette.subText }]}>
-          Brak siłowni pasujących do zapytania "{searchQuery}".
+          No gyms match the query "{searchQuery}".
         </Text>
       );
     }
@@ -109,7 +108,7 @@ export const DashboardHome: React.FC = () => {
         renderItem={({ item }) => (
           <GymListItem 
             gym={item} 
-            onPress={handleGymPress} // Przekazujemy funkcję do przejścia w widok DETAILS
+            onPress={handleGymPress} // Pass function to navigate to the DETAILS view
           />
         )}
         style={{ flex: 1 }}
@@ -131,8 +130,7 @@ export const DashboardHome: React.FC = () => {
 
   return (
     <View style={localStyles.screen}> 
-      
-      {/* SearchBar jest zawsze na górze */}
+      {/* SearchBar is always at the top */}
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <SearchBar 
             styles={styles} 
@@ -142,7 +140,7 @@ export const DashboardHome: React.FC = () => {
         />
       </View>
 
-      {/* Warunkowe renderowanie: wyniki wyszukiwania LUB oryginalna zawartość */}
+      {/* Conditional rendering: search results OR original content */}
       {isSearching ? (
         <View style={localStyles.flatlistContainer}>
             {renderSearchResults()}

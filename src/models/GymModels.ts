@@ -1,4 +1,4 @@
-// Definicja pojedynczej siłowni
+// Definition of a single gym
 export interface Gym {
     id: string;
     name: string;
@@ -16,7 +16,7 @@ export interface Gym {
     category?: string;        
 }
 
-// Typ propsów dla komponentu wyświetlającego szczegóły
+// Props type for gym details component
 export interface GymDetailsProps {
     gymId: string;
     onClose: () => void;

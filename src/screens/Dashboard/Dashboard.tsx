@@ -22,7 +22,7 @@ export const Dashboard: React.FC = () => {
   const HEADER_HEIGHT = Platform.OS === 'ios' ? 100 : 90;
   const pageHeight = Math.max(480, height - HEADER_HEIGHT - insets.bottom);
 
-  /** Zmiana zakładki przez PagerView */
+  /** Change tab via PagerView */
   const handleTabChange = useCallback(
     (tab: 'home' | 'user-posts' | 'community') => {
       setActiveTab(tab);
@@ -40,7 +40,7 @@ export const Dashboard: React.FC = () => {
     []
   );
 
-  /** Aktualizacja aktywnej zakładki gdy użytkownik przesuwa pager */
+  /** Update active tab when user swipes the pager */
   const handlePageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
     const tabs: ('home' | 'user-posts' | 'community')[] = ['home', 'user-posts', 'community'];
@@ -51,7 +51,7 @@ export const Dashboard: React.FC = () => {
     }
   }, []);
 
-  // Funkcja do włączenia pager view (wywoływana z CommunityFeedSection)
+  // Function to enable pager view again (called from CommunityFeedSection)
   const enablePagerView = useCallback(() => {
     setPagerEnabled(true);
   }, []);
@@ -70,17 +70,17 @@ export const Dashboard: React.FC = () => {
         overdrag={true}
         keyboardDismissMode="on-drag"
       >
-        {/* Sekcja Home - Strona 0 */}
+      {/* Home section - Page 0 */}
         <View key="0" style={{ flex: 1 }}>
           <DashboardHome />
         </View>
 
-        {/* Sekcja My Posts - Strona 1 */}
+        {/* My Posts section - Page 1 */}
         <View key="1" style={{ flex: 1 }}>
           <UserPostsSection availableHeight={pageHeight} />
         </View>
 
-        {/* Sekcja Community - Strona 2 */}
+        {/* Community section - Page 2 */}
         <View key="2" style={{ flex: 1 }}>
           <CommunityFeedSection 
             availableHeight={pageHeight} 

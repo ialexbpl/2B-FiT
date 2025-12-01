@@ -55,7 +55,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ activeTab, onT
   return (
     <View style={styles.container}>
     
-      {/* Tabs - 4 zakładki */}
+      {/* Tabs - 3 entries */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={styles.tab}

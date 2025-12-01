@@ -1,18 +1,18 @@
-import { supabase } from '../config/supabase'; // Zaimportuj klienta Supabase
+import { supabase } from '../config/supabase'; // Import Supabase client
 import { Gym } from '../models/GymModels';
 
 /**
- * Pobiera siłownie, filtrując po adresie lub mieście.
+ * Fetches gyms, filtering by address or city.
  */
 export const fetchGyms = async (query: string = ''): Promise<Gym[]> => {
   try {
     let queryBuilder = supabase
       .from('gyms')
-      .select('id, name, address, city'); // Pobieramy tylko potrzebne pola
+      .select('id, name, address, city'); // Fetch only required fields
 
     if (query.trim()) {
       const searchTerms = query.toLowerCase().trim();
-      // Wyszukujemy adres LUB miasto zawierające frazę (case-insensitive)
+      // Search by address OR city containing the phrase (case-insensitive)
       queryBuilder = queryBuilder.or(
         `address.ilike.%${searchTerms}%,city.ilike.%${searchTerms}%`
       );
@@ -21,19 +21,19 @@ export const fetchGyms = async (query: string = ''): Promise<Gym[]> => {
     const { data, error } = await queryBuilder;
 
     if (error) {
-      console.error("Błąd Supabase podczas pobierania siłowni:", error.message);
+      console.error("Supabase error while fetching gyms:", error.message);
       return [];
     }
 
     return data as Gym[];
   } catch (err) {
-    console.error("Nieoczekiwany błąd w fetchGyms:", err);
+    console.error("Unexpected error in fetchGyms:", err);
     return [];
   }
 };
 
 /**
- * Pobiera szczegóły pojedynczej siłowni na podstawie jej ID.
+ * Fetches details of a single gym by its ID.
  */
 export const fetchGymDetails = async (id: string): Promise<Gym | undefined> => {
   try {
@@ -44,14 +44,14 @@ export const fetchGymDetails = async (id: string): Promise<Gym | undefined> => {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error("Błąd Supabase podczas pobierania szczegółów:", error.message);
+      console.error("Supabase error while fetching gym details:", error.message);
       return undefined;
     }
     
     return data as Gym | undefined;
 
   } catch (err) {
-    console.error("Nieoczekiwany błąd w fetchGymDetails:", err);
+    console.error("Unexpected error in fetchGymDetails:", err);
     return undefined;
   }
 };
