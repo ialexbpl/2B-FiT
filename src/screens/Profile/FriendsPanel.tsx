@@ -20,16 +20,16 @@ const fallbackAvatar = require('../../assets/logo.png');
 const PREVIEW_LIMIT = 5;
 
 const formatDate = (value: string | null) => {
-  if (!value) return 'przed chwilą';
+  if (!value) return 'just now';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'przed chwilą';
+  if (Number.isNaN(date.getTime())) return 'just now';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
 const resolveName = (profile: { full_name: string | null; username: string | null }) =>
   (profile.full_name && profile.full_name.trim().length ? profile.full_name.trim() : null) ||
   profile.username ||
-  'Użytkownik';
+  'User';
 
 const resolveUsername = (profile: { username: string | null }) =>
   profile.username ? `@${profile.username}` : '';
@@ -71,8 +71,8 @@ export const FriendsPanel: React.FC = () => {
     try {
       await runner();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Coś poszło nie tak';
-      Alert.alert('Ups!', message);
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      Alert.alert('Oops!', message);
     }
   }, []);
 
@@ -110,14 +110,14 @@ export const FriendsPanel: React.FC = () => {
 
   const handleRespondFromSearch = useCallback(
     (friendshipId: string, displayName: string) => {
-      Alert.alert(`Odpowiedź dla ${displayName}`, 'Akceptujesz czy odrzucasz zaproszenie?', [
-        { text: 'Później', style: 'cancel' },
+      Alert.alert(`Response for ${displayName}`, 'Do you accept or decline the invitation?', [
+        { text: 'Later', style: 'cancel' },
         {
-          text: 'Odrzuć',
+          text: 'Decline',
           style: 'destructive',
           onPress: () => safeAction(() => declineInvite(friendshipId)),
         },
-        { text: 'Akceptuj', onPress: () => safeAction(() => acceptInvite(friendshipId)) },
+        { text: 'Accept', onPress: () => safeAction(() => acceptInvite(friendshipId)) },
       ]);
     },
     [acceptInvite, declineInvite, safeAction]
@@ -185,7 +185,7 @@ export const FriendsPanel: React.FC = () => {
       action = (
         <View style={styles.friendStatusPill}>
           <Icon name="lock-closed" size={14} color={palette.subText} />
-          <Text style={styles.friendStatusPillText}>Niedostępny</Text>
+          <Text style={styles.friendStatusPillText}>Unavailable</Text>
         </View>
       );
     }
@@ -209,7 +209,7 @@ export const FriendsPanel: React.FC = () => {
     <>
       <View style={styles.section}>
         <View style={styles.friendHeader}>
-          <Text style={styles.sectionTitle}>Znajomi</Text>
+          <Text style={styles.sectionTitle}>Friends</Text>
           <View style={styles.friendHeaderMeta}>
             {relationshipsLoading ? <ActivityIndicator size="small" color={palette.primary} /> : null}
             <Text style={styles.friendCounter}>{friendCount}</Text>
@@ -220,7 +220,7 @@ export const FriendsPanel: React.FC = () => {
           <View style={styles.friendNotificationCard}>
             <View style={styles.friendNotificationHeader}>
               <Icon name="notifications-outline" size={18} color={palette.primary} />
-              <Text style={styles.friendNotificationTitle}>Nowe akceptacje</Text>
+              <Text style={styles.friendNotificationTitle}>New acceptances</Text>
             </View>
             {acceptanceNotifications.map(item => (
               <View key={item.id} style={styles.friendNotificationRow}>
@@ -231,7 +231,7 @@ export const FriendsPanel: React.FC = () => {
                 <View style={styles.friendNotificationText}>
                   <Text style={styles.friendRowName}>{resolveName(item.other)}</Text>
                   <Text style={styles.friendRowMeta}>
-                    zaakceptował zaproszenie • {formatDate(item.responded_at ?? null)}
+                    accepted your invitation • {formatDate(item.responded_at ?? null)}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -252,7 +252,7 @@ export const FriendsPanel: React.FC = () => {
 
         {incomingRequests.length > 0 ? (
           <View style={styles.friendRequestCard}>
-            <Text style={styles.inlineSectionTitle}>Oczekujące zaproszenia</Text>
+            <Text style={styles.inlineSectionTitle}>Pending invitations</Text>
             {incomingRequests.map(request => (
               <View key={request.id} style={styles.friendRequestRow}>
                 <Image
@@ -261,7 +261,7 @@ export const FriendsPanel: React.FC = () => {
                 />
                 <View style={styles.friendRowInfo}>
                   <Text style={styles.friendRowName}>{resolveName(request.other)}</Text>
-                  <Text style={styles.friendRowMeta}>czeka na odpowiedź</Text>
+                  <Text style={styles.friendRowMeta}>waiting for response</Text>
                 </View>
                 <View style={styles.friendRequestActions}>
                   <TouchableOpacity
@@ -272,7 +272,7 @@ export const FriendsPanel: React.FC = () => {
                     {isFriendshipMutating(request.id) ? (
                       <ActivityIndicator size="small" color={palette.subText} />
                     ) : (
-                      <Text style={styles.friendGhostButtonText}>Odrzuć</Text>
+                      <Text style={styles.friendGhostButtonText}>Decline</Text>
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -283,7 +283,7 @@ export const FriendsPanel: React.FC = () => {
                     {isFriendshipMutating(request.id) ? (
                       <ActivityIndicator size="small" color={palette.onPrimary} />
                     ) : (
-                      <Text style={styles.friendPrimaryButtonText}>Akceptuj</Text>
+                      <Text style={styles.friendPrimaryButtonText}>Accept</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -294,7 +294,7 @@ export const FriendsPanel: React.FC = () => {
 
         <View style={styles.friendPreviewGrid}>
           {friendsPreview.length === 0 ? (
-            <Text style={styles.friendPreviewEmpty}>Nie masz jeszcze znajomych.</Text>
+            <Text style={styles.friendPreviewEmpty}>You don't have any friends yet.</Text>
           ) : (
             friendsPreview.map(entry => {
               const username = resolveUsername(entry.profile);
@@ -314,7 +314,7 @@ export const FriendsPanel: React.FC = () => {
           )}
         </View>
         {friendCount > PREVIEW_LIMIT ? (
-          <Text style={styles.friendPreviewMore}>+{friendCount - PREVIEW_LIMIT} więcej znajomych</Text>
+          <Text style={styles.friendPreviewMore}>+{friendCount - PREVIEW_LIMIT} more friends</Text>
         ) : null}
 
         <View style={styles.friendActionsRow}>
@@ -324,7 +324,7 @@ export const FriendsPanel: React.FC = () => {
             onPress={() => setFriendsModalVisible(true)}
           >
             <Icon name="people-outline" size={16} color={palette.text} />
-            <Text style={styles.friendSecondaryText}>Zobacz znajomych</Text>
+            <Text style={styles.friendSecondaryText}>View friends</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.friendSecondaryButton, styles.friendSecondaryButtonLast]}
@@ -332,7 +332,7 @@ export const FriendsPanel: React.FC = () => {
             onPress={openFinderModal}
           >
             <Icon name="person-add-outline" size={16} color={palette.text} />
-            <Text style={styles.friendSecondaryText}>Szukaj znajomych</Text>
+            <Text style={styles.friendSecondaryText}>Find friends</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -341,7 +341,7 @@ export const FriendsPanel: React.FC = () => {
         <View style={styles.friendModalOverlay}>
           <View style={styles.friendModalCard}>
             <View style={styles.friendModalHeader}>
-              <Text style={styles.friendModalTitle}>Twoi znajomi ({friendCount})</Text>
+              <Text style={styles.friendModalTitle}>Your friends ({friendCount})</Text>
               <TouchableOpacity onPress={closeFriendsModal} style={styles.friendModalClose}>
                 <Icon name="close" size={20} color={palette.text} />
               </TouchableOpacity>
@@ -351,13 +351,13 @@ export const FriendsPanel: React.FC = () => {
               <TextInput
                 value={friendsFilter}
                 onChangeText={setFriendsFilter}
-                placeholder="Filtruj po imieniu lub username"
+                placeholder="Filter by name or username"
                 placeholderTextColor={palette.subText}
                 style={styles.friendSearchInput}
               />
             </View>
             {filteredFriends.length === 0 ? (
-              <Text style={[styles.friendListEmpty, { marginTop: 20 }]}>Brak dopasowań.</Text>
+              <Text style={[styles.friendListEmpty, { marginTop: 20 }]}>No matches.</Text>
             ) : (
               <FlatList
                 data={filteredFriends}
@@ -375,7 +375,7 @@ export const FriendsPanel: React.FC = () => {
         <View style={styles.friendModalOverlay}>
           <View style={styles.friendModalCard}>
             <View style={styles.friendModalHeader}>
-              <Text style={styles.friendModalTitle}>Szukaj nowych znajomych</Text>
+              <Text style={styles.friendModalTitle}>Find new friends</Text>
               <TouchableOpacity onPress={closeFinderModal} style={styles.friendModalClose}>
                 <Icon name="close" size={20} color={palette.text} />
               </TouchableOpacity>
@@ -385,7 +385,7 @@ export const FriendsPanel: React.FC = () => {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Wpisz nazwę użytkownika"
+                placeholder="Enter username"
                 placeholderTextColor={palette.subText}
                 style={styles.friendSearchInput}
                 autoFocus
@@ -394,7 +394,7 @@ export const FriendsPanel: React.FC = () => {
             </View>
             {availableCandidates.length === 0 && !searchLoading ? (
               <Text style={[styles.friendListEmpty, { marginTop: 20 }]}>
-                Brak użytkowników pasujących do wyszukiwania.
+                No users match the search.
               </Text>
             ) : (
               <FlatList

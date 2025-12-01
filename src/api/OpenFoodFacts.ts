@@ -26,7 +26,7 @@ function normalizeAllergenTags(raw?: string): string | undefined {
 
   const cleaned = tokens
     .map((t) => {
-      // "en:milk" -> "milk", "pl:orzechy" -> "orzechy"
+      // "en:milk" -> "milk", "pl:nuts" -> "nuts"
       const parts = t.split(":");
       return parts.length > 1 ? parts.slice(1).join(":") : t;
     })
@@ -103,8 +103,8 @@ type OpenFoodFactsSearchV1Response = {
 };
 
 /**
- * Prosta "baza produktów" oparta o publiczne API OpenFoodFacts.
- * Zwraca ujednolicony model Product albo null, jeśli nic nie znaleziono.
+ * Simple "product database" based on the public OpenFoodFacts API.
+ * Returns a unified Product model or null if nothing was found.
  */
 export async function fetchProductByBarcode(
   barcode: string
@@ -168,9 +168,9 @@ export async function fetchProductByBarcode(
 
 
 /**
- * Wyszukiwanie produktu po nazwie.
- * Korzysta z v1 search API (cgi/search.pl), które wspiera full-text search.
- * Zwraca pierwszy pasujący produkt lub null.
+ * Search for a product by name.
+ * Uses the v1 search API (cgi/search.pl), which supports full-text search.
+ * Returns the first matching product or null.
  */
 export async function fetchProductByName(
   name: string

@@ -463,7 +463,7 @@ export default function Calendar() {
   );
 }
 
-/** Wrapper: iOS przesuwa kartę nad klawiaturą */
+/** Wrapper: iOS moves the card above the keyboard */
 const KeyboardAvoidingKeyboardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <KeyboardAvoidingView
@@ -512,7 +512,7 @@ const TimeField: React.FC<{
   }, [value, minuteStep]);
 
   const onChangeAndroid = (_: any, selected?: Date) => {
-    // Android: dialog zamyka się sam – domknij stan i ustaw wartość
+    // Android: dialog closes itself – close state and set value
     setOpen(false);
     if (!selected) return;
     onChange(dateToHHMM(roundToStep(selected, minuteStep)));

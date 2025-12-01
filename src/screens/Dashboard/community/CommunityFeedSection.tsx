@@ -1,4 +1,4 @@
-// CommunityFeedSection.tsx - Z OBSŁUGĄ PAGER VIEW
+// CommunityFeedSection.tsx - WITH PAGER VIEW SUPPORT
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
 import { useTheme } from '@context/ThemeContext';

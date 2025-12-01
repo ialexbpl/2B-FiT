@@ -34,11 +34,11 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
             if (data) {
                 setGym(data);
             } else {
-                setError("Nie udało się pobrać danych siłowni.");
+                setError("Failed to fetch gym data.");
             }
         }
       } catch (err) {
-        if (isMounted) setError("Wystąpił błąd podczas pobierania danych.");
+        if (isMounted) setError("An error occurred while fetching data.");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -124,7 +124,7 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
       return (
           <View style={[styles.container, styles.centerContainer]}>
               <ActivityIndicator size="large" color={palette.primary} />
-              <Text style={{ marginTop: 10, color: palette.subText }}>Ładowanie informacji...</Text>
+              <Text style={{ marginTop: 10, color: palette.subText }}>Loading information...</Text>
           </View>
       );
   }
@@ -135,10 +135,10 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
           <View style={[styles.container, styles.centerContainer]}>
               <Ionicons name="alert-circle-outline" size={48} color={palette.subText} />
               <Text style={{ marginTop: 10, color: palette.text, fontSize: 16, textAlign: 'center' }}>
-                  {error || "Nie znaleziono szczegółów tej siłowni."}
+                  {error || "No details found for this gym."}
               </Text>
               <TouchableOpacity onPress={onClose} style={{ marginTop: 20, padding: 10 }}>
-                  <Text style={{ color: palette.primary, fontWeight: 'bold', fontSize: 16 }}>Wróć do listy</Text>
+                  <Text style={{ color: palette.primary, fontWeight: 'bold', fontSize: 16 }}>Back to list</Text>
               </TouchableOpacity>
           </View>
       );
@@ -173,7 +173,7 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
             </View>
             
             <Text style={styles.categoryText}>
-                {gym.category || 'Siłownia'} • {gym.city}
+                {gym.category || 'Gym'} • {gym.city}
             </Text>
 
             <View style={styles.actionRow}>
@@ -181,32 +181,32 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
                     <View style={styles.actionIconCircle}>
                         <Ionicons name="navigate" size={22} color={palette.primary} />
                     </View>
-                    <Text style={styles.actionLabel}>Trasa</Text>
+                    <Text style={styles.actionLabel}>Route</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
                     <View style={styles.actionIconCircle}>
                         <Ionicons name="call" size={22} color={palette.primary} />
                     </View>
-                    <Text style={styles.actionLabel}>Zadzwoń</Text>
+                    <Text style={styles.actionLabel}>Call</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionBtn}>
                     <View style={styles.actionIconCircle}>
                         <Ionicons name="bookmark-outline" size={22} color={palette.text} />
                     </View>
-                    <Text style={styles.actionLabel}>Zapisz</Text>
+                    <Text style={styles.actionLabel}>Save</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionBtn}>
                     <View style={styles.actionIconCircle}>
                         <Ionicons name="share-social-outline" size={22} color={palette.text} />
                     </View>
-                    <Text style={styles.actionLabel}>Udostępnij</Text>
+                    <Text style={styles.actionLabel}>Share</Text>
                 </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Informacje</Text>
+            <Text style={styles.sectionTitle}>Information</Text>
 
             <TouchableOpacity style={styles.infoRow} onPress={handleRoute}>
                 <View style={styles.infoIcon}><Ionicons name="location-outline" size={24} color={palette.subText} /></View>
@@ -220,10 +220,10 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
                 <View style={styles.infoIcon}><Ionicons name="time-outline" size={24} color={palette.subText} /></View>
                 <View style={styles.infoTextContainer}>
                     <Text style={styles.infoTextMain}>
-                        <Text style={styles.statusOpen}>{gym.open_status || 'Otwarte'}</Text>
-                        {gym.closing_time && <Text style={{fontWeight: 'normal'}}> • Zamknięcie: {gym.closing_time}</Text>}
+                        <Text style={styles.statusOpen}>{gym.open_status || 'Open'}</Text>
+                        {gym.closing_time && <Text style={{fontWeight: 'normal'}}> • Closes at: {gym.closing_time}</Text>}
                     </Text>
-                    <Text style={styles.infoTextSub}>Godziny mogą się różnić w święta</Text>
+                    <Text style={styles.infoTextSub}>Hours may vary on holidays</Text>
                 </View>
             </View>
 
@@ -231,7 +231,7 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
                 <TouchableOpacity style={styles.infoRow} onPress={handleWebsite}>
                     <View style={styles.infoIcon}><Ionicons name="globe-outline" size={24} color={palette.subText} /></View>
                     <View style={styles.infoTextContainer}>
-                        <Text style={styles.infoTextMain}>Strona internetowa</Text>
+                        <Text style={styles.infoTextMain}>Website</Text>
                         <Text style={styles.infoTextSub} numberOfLines={1}>{gym.website_url}</Text>
                     </View>
                 </TouchableOpacity>
@@ -242,7 +242,7 @@ export const GymDetailsScreen: React.FC<GymDetailsProps> = ({ gymId, onClose }) 
                     <View style={styles.infoIcon}><Ionicons name="call-outline" size={24} color={palette.subText} /></View>
                     <View style={styles.infoTextContainer}>
                         <Text style={styles.infoTextMain}>{gym.phone_number}</Text>
-                        <Text style={styles.infoTextSub}>Numer telefonu</Text>
+                        <Text style={styles.infoTextSub}>Phone number</Text>
                     </View>
                 </TouchableOpacity>
             )}

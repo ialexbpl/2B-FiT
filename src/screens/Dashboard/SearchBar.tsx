@@ -8,7 +8,7 @@ import type { Styles } from './DashboardStyles';
 type Props = {
     styles: Styles;
     palette: Palette;
-    // DODANE PROPSY:
+    // ADDED PROPS:
     query: string;
     onSearch: (text: string) => void;
 };
@@ -18,15 +18,15 @@ export const SearchBar: React.FC<Props> = ({ styles, palette, query, onSearch })
         <View style={styles.searchBar}>
             <Ionicons name="search" size={20} color={palette.subText} />
             <TextInput
-                // Zmieniony placeholder na bardziej adekwatny
-                placeholder="Wyszukaj siłownię po adresie lub mieście..."
+                // Updated placeholder to be more descriptive
+                placeholder="Search for a gym by address or city..."
                 placeholderTextColor={palette.subText}
                 style={styles.searchInput}
-                // DODANE OBSŁUGI ZDARZEŃ:
+                // ADDED EVENT HANDLERS:
                 value={query}
                 onChangeText={onSearch}
             />
-             {/* Opcjonalny przycisk czyszczący, jeśli query nie jest puste */}
+             {/* Optional clear button when query is not empty */}
              {query.length > 0 && (
                  <Ionicons 
                     name="close-circle" 
