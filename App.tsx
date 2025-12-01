@@ -1,6 +1,6 @@
 // App.tsx
-import React, { useEffect } from 'react';
-import { StatusBar, Platform } from 'react-native';
+import React from 'react';
+import { StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { RootTabs } from '@navigation/RootTabs';
@@ -8,17 +8,6 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import Login from '@screens/Login/Login';
-
-import * as Notifications from 'expo-notifications';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 function AppShell() {
   const { isDark, palette } = useTheme();
@@ -38,15 +27,6 @@ function AppShell() {
 }
 
 export default function App() {
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
-    }
-  }, []);
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>

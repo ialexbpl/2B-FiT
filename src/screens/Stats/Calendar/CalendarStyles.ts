@@ -353,23 +353,4 @@ export const makeCalendarStyles = (palette: Palette, tokens = theme) =>
     btnDisabled: {
       opacity: 0.6,
     },
-    reminderRow: {
-      marginTop: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    reminderLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: palette.text,
-    },
-    reminderHint: {
-      fontSize: 12,
-      color: palette.subText,
-      marginTop: 2,
-    },
   });
