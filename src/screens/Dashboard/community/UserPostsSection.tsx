@@ -57,29 +57,33 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     return `${Math.floor(diffInSeconds / 3600)}h ago`;
   };
 
-  const convertToLegacyPost = (post: any) => ({
-    id: post.id,
-    user: {
-      id: post.user?.id || post.user_id || session?.user?.id || 'unknown',
-      username: post.user?.full_name || post.user?.username || profile?.full_name || profile?.username || 'You',
-      avatar: post.user?.avatar_url || profile?.avatar_url,
-      isVerified: false,
-    },
-    content: post.content,
-    image: post.image_url,
-    likes: post.likes_count || 0,
-    comments: [],
-    commentsCount: post.comments_count || 0,
-    timestamp: post.created_at,
-    isLiked: post.is_liked || false,
-    type: post.post_type,
-    metrics: {
-      calories: post.calories || undefined,
-      duration: post.duration || undefined,
-      distance: post.distance || undefined,
-      weight: post.weight || undefined,
-    },
-  });
+  const convertToLegacyPost = (post: any, nameForUser: string) => {
+    const isSelf = post.user_id === session?.user?.id;
+    const avatar = post.user?.avatar_url || (isSelf ? profile?.avatar_url : undefined);
+    return {
+      id: post.id,
+      user: {
+        id: post.user?.id || post.user_id || session?.user?.id || 'unknown',
+        username: post.user?.full_name || post.user?.username || nameForUser,
+        avatar,
+        isVerified: false,
+      },
+      content: post.content,
+      image: post.image_url,
+      likes: post.likes_count || 0,
+      comments: [],
+      commentsCount: post.comments_count || 0,
+      timestamp: post.created_at,
+      isLiked: post.is_liked || false,
+      type: post.post_type,
+      metrics: {
+        calories: post.calories || undefined,
+        duration: post.duration || undefined,
+        distance: post.distance || undefined,
+        weight: post.weight || undefined,
+      },
+    };
+  };
 
   const stats: PostStats = {
     posts: userPosts.length,
@@ -105,7 +109,21 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     <Ionicons name="person" size={48} color={palette.subText} />
   );
 
-  const displayName = profile?.full_name || profile?.username || 'Your Profile';
+  const displayName = useMemo(() => {
+    const trimmedFullName = profile?.full_name?.trim();
+    if (trimmedFullName) return trimmedFullName;
+    if (profile?.username) return profile.username;
+    const usernameMeta =
+      typeof session?.user?.user_metadata?.username === 'string'
+        ? session.user.user_metadata.username
+        : null;
+    if (usernameMeta) return usernameMeta;
+    const email = session?.user?.email;
+    if (email && email.includes('@')) {
+      return email.split('@')[0];
+    }
+    return 'Your Profile';
+  }, [profile?.full_name, profile?.username, session?.user?.email, session?.user?.user_metadata?.username]);
   const meta = session?.user?.user_metadata as any;
   const bioText = meta?.bio || 'Add a short bio about yourself.';
   const hashtagsText = meta?.hashtags || '';
@@ -242,7 +260,7 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent
-            post={convertToLegacyPost(item)}
+            post={convertToLegacyPost(item, displayName)}
             onLike={() => likePost(item.id)}
             onComment={handleComment}
             onDelete={() => deletePost(item.id)}

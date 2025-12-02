@@ -137,7 +137,25 @@ export const SurveyScreen: React.FC<SurveyProps> = ({ onCompleted }) => {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        setApiError('Unable to get current user.');
+        setApiError('Unable to get current user. Please sign in again.');
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // Ensure profiles row exists (may be missing if user was deleted manually).
+      const fallbackUsername = user.email ? user.email.split('@')[0] : `user_${user.id.slice(0, 8)}`;
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          username: (user.user_metadata as any)?.username || fallbackUsername,
+          full_name: (user.user_metadata as any)?.full_name || user.email || fallbackUsername,
+          avatar_url: (user.user_metadata as any)?.avatar_url || null,
+        }, { onConflict: 'id' });
+      if (profileError) {
+        console.error(profileError);
+        setApiError('Failed to create your profile. Please sign in again.');
+        await supabase.auth.signOut();
         return;
       }
 

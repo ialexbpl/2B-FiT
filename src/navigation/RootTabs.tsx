@@ -91,12 +91,12 @@ export function RootTabs() {
           const completed = Boolean(
             profile &&
               profile.sex &&
-              profile.age !== null &&
-              profile.height_cm !== null &&
-              profile.weight_kg !== null &&
-              profile.goal_weight_kg !== null &&
+              profile.age && profile.age > 0 &&
+              profile.height_cm && profile.height_cm > 0 &&
+              profile.weight_kg && profile.weight_kg > 0 &&
+              profile.goal_weight_kg && profile.goal_weight_kg > 0 &&
               profile.activity_level &&
-              profile.allergies &&
+              Array.isArray(profile.allergies) &&
               profile.allergies.length > 0
           );
 
@@ -105,7 +105,8 @@ export function RootTabs() {
       } catch (e) {
         console.warn('Failed to fetch profile settings', e);
         if (!cancelled) {
-          setHasProfile(true);
+          // If we cannot load settings, force onboarding to collect required data
+          setHasProfile(false);
         }
       } finally {
         if (!cancelled) {

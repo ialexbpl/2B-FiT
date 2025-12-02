@@ -1,6 +1,18 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, FlatList, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  ScrollView,
+  SectionList,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import { useTheme } from '@context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@context/AuthContext';
 
 import { makeDashboardStyles } from './DashboardStyles';
 import { SearchBar } from './SearchBar';
@@ -9,113 +21,215 @@ import { WeightCard } from './WeightCard';
 import { SleepChart } from './SleepChart';
 import { FoodIntake } from './FoodIntake';
 
-
 import { fetchGyms } from '../../api/gymService';
-import { Gym } from '../../models/GymModels'; 
-import { GymListItem } from './GymListItem'; 
-import { GymDetailsScreen } from './GymDetailsScreen'; 
+import { Gym } from '../../models/GymModels';
+import { GymListItem } from './GymListItem';
+import { GymDetailsScreen } from './GymDetailsScreen';
+import { searchUsers, type UserSearchResult } from '../../api/userService';
 
+type ActiveView = { type: 'WIDGETS_OR_LIST' } | { type: 'DETAILS'; gymId: string };
 
-type ActiveView = { type: 'WIDGETS_OR_LIST' } | { type: 'DETAILS', gymId: string };
+type SearchSection =
+  | { title: 'Users'; key: 'users'; data: UserSearchResult[] }
+  | { title: 'Gyms'; key: 'gyms'; data: Gym[] };
 
 const localStyles = StyleSheet.create({
   loadingText: { textAlign: 'center', marginTop: 30, fontSize: 16 },
   noResultsText: { textAlign: 'center', marginTop: 30, fontSize: 16 },
   flatlistContainer: { flex: 1, paddingHorizontal: 16 },
-  screen: { flex: 1 }
+  screen: { flex: 1 },
+  sectionHeader: { fontSize: 13, fontWeight: '700', marginTop: 12, marginBottom: 8 },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  userAvatarImage: { width: 40, height: 40, borderRadius: 20 },
+  userTextWrapper: { flex: 1 },
+  userName: { fontSize: 15, fontWeight: '600' },
+  userHandle: { fontSize: 12 },
 });
-
 
 export const DashboardHome: React.FC = () => {
   const { palette, theme } = useTheme();
+  const { session } = useAuth();
+  const navigation = useNavigation<any>();
   const styles = useMemo(() => makeDashboardStyles(palette, theme), [palette, theme]);
-  
-  
+
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'WIDGETS_OR_LIST' });
 
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [gyms, setGyms] = useState<Gym[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<UserSearchResult[]>([]);
+  const [gymLoading, setGymLoading] = useState(false);
+  const [userLoading, setUserLoading] = useState(false);
 
   const loadGyms = useCallback(async (query: string) => {
     if (query.trim() === '') {
       setGyms([]);
       return;
     }
-    setLoading(true);
+    setGymLoading(true);
     try {
       const result = await fetchGyms(query);
       setGyms(result);
     } catch (error) {
-      console.error("Error while loading gyms:", error);
+      console.error('Error while loading gyms:', error);
     } finally {
-      setLoading(false);
+      setGymLoading(false);
     }
   }, []);
 
+  const loadUsers = useCallback(
+    async (query: string) => {
+      if (query.trim() === '') {
+        setUsers([]);
+        return;
+      }
+      setUserLoading(true);
+      try {
+        const results = await searchUsers(query, session?.user?.id);
+        setUsers(results);
+      } catch (error) {
+        console.error('Error while loading users:', error);
+        setUsers([]);
+      } finally {
+        setUserLoading(false);
+      }
+    },
+    [session?.user?.id]
+  );
+
   useEffect(() => {
-    
-    if (searchQuery.length > 2 || searchQuery.length === 0) {
-        loadGyms(searchQuery);
+    const normalized = searchQuery.trim();
+    if (normalized.length === 0) {
+      setGyms([]);
+      setUsers([]);
+      return;
     }
-  }, [searchQuery, loadGyms]);
-  
+    loadGyms(normalized);
+    loadUsers(normalized);
+  }, [searchQuery, loadGyms, loadUsers]);
+
   const handleGymPress = (gym: Gym) => {
     setActiveView({ type: 'DETAILS', gymId: gym.id });
   };
-  
-  // Function to return from the details screen
+
+  const handleUserPress = (user: UserSearchResult) => {
+    navigation.navigate('UserProfileFeed', {
+      userId: user.id,
+      username: user.full_name || user.username,
+    });
+  };
+
   const handleCloseDetails = () => {
     setActiveView({ type: 'WIDGETS_OR_LIST' });
   };
 
+  const isSearching = searchQuery.trim().length > 0;
+  const searchLoading = gymLoading || userLoading;
 
-  const isSearching = searchQuery.length > 0;
-
-
-  
   if (activeView.type === 'DETAILS') {
     return (
-     
-      <GymDetailsScreen 
-        gymId={activeView.gymId} 
-        onClose={handleCloseDetails} 
+      <GymDetailsScreen
+        gymId={activeView.gymId}
+        onClose={handleCloseDetails}
       />
     );
   }
 
+  const renderUserItem = (user: UserSearchResult) => (
+    <TouchableOpacity
+      onPress={() => handleUserPress(user)}
+      style={[localStyles.userRow, { borderBottomColor: palette.border }]}
+      activeOpacity={0.85}
+    >
+      <View style={[localStyles.userAvatar, { backgroundColor: palette.card }]}>
+        {user.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={localStyles.userAvatarImage} />
+        ) : (
+          <Ionicons name="person" size={18} color={palette.subText} />
+        )}
+      </View>
+      <View style={localStyles.userTextWrapper}>
+        <Text style={[localStyles.userName, { color: palette.text }]}>
+          {user.full_name || user.username || 'User'}
+        </Text>
+        {user.username ? (
+          <Text style={[localStyles.userHandle, { color: palette.subText }]}>
+            @{user.username}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="arrow-forward" size={18} color={palette.subText} />
+    </TouchableOpacity>
+  );
 
-  
-  
   const renderSearchResults = () => {
-    if (loading) {
+    if (searchLoading) {
       return <ActivityIndicator size="large" color={palette.primary} style={localStyles.loadingText} />;
     }
-    
-    if (gyms.length === 0 && searchQuery.length > 2) {
+
+    if (!searchLoading && searchQuery.trim().length > 0 && gyms.length === 0 && users.length === 0) {
       return (
         <Text style={[localStyles.noResultsText, { color: palette.subText }]}>
-          No gyms match the query "{searchQuery}".
+          No gyms or users match "{searchQuery}".
+        </Text>
+      );
+    }
+
+    const sections: SearchSection[] = [];
+    if (users.length > 0) sections.push({ title: 'Users', key: 'users', data: users });
+    if (gyms.length > 0) sections.push({ title: 'Gyms', key: 'gyms', data: gyms });
+
+    if (sections.length === 0) {
+      return (
+        <Text style={[localStyles.noResultsText, { color: palette.subText }]}>
+          Start typing to search gyms or users.
         </Text>
       );
     }
 
     return (
-      <FlatList
-        data={gyms}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <GymListItem 
-            gym={item} 
-            onPress={handleGymPress} // Pass function to navigate to the DETAILS view
-          />
+      <SectionList
+        sections={sections}
+        keyExtractor={(item, index, section) =>
+          section?.title === 'Users'
+            ? `user-${(item as UserSearchResult).id}-${index}`
+            : `gym-${(item as Gym).id}-${index}`
+        }
+        keyboardShouldPersistTaps="handled"
+        renderItem={({ item, section }) =>
+          section.title === 'Users'
+            ? renderUserItem(item as UserSearchResult)
+            : (
+              <GymListItem
+                gym={item as Gym}
+                onPress={handleGymPress}
+              />
+            )
+        }
+        renderSectionHeader={({ section }) => (
+          <Text style={[localStyles.sectionHeader, { color: palette.subText }]}>
+            {section.title}
+          </Text>
         )}
-        style={{ flex: 1 }}
+        stickySectionHeadersEnabled={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 16 }}
       />
     );
   };
-  
+
   const renderDashboardWidgets = () => (
     <>
       <View style={styles.statsRow}>
@@ -127,23 +241,20 @@ export const DashboardHome: React.FC = () => {
     </>
   );
 
-
   return (
-    <View style={localStyles.screen}> 
-      {/* SearchBar is always at the top */}
+    <View style={localStyles.screen}>
       <View style={{ padding: 16, paddingBottom: 0 }}>
-        <SearchBar 
-            styles={styles} 
-            palette={palette} 
-            query={searchQuery}
-            onSearch={setSearchQuery} 
+        <SearchBar
+          styles={styles}
+          palette={palette}
+          query={searchQuery}
+          onSearch={setSearchQuery}
         />
       </View>
 
-      {/* Conditional rendering: search results OR original content */}
       {isSearching ? (
         <View style={localStyles.flatlistContainer}>
-            {renderSearchResults()}
+          {renderSearchResults()}
         </View>
       ) : (
         <ScrollView

@@ -18,8 +18,8 @@ export const SearchBar: React.FC<Props> = ({ styles, palette, query, onSearch })
         <View style={styles.searchBar}>
             <Ionicons name="search" size={20} color={palette.subText} />
             <TextInput
-                // Updated placeholder to be more descriptive
-                placeholder="Search for a gym by address or city..."
+                // Updated placeholder to reflect gym + user search
+                placeholder="Search gyms or users..."
                 placeholderTextColor={palette.subText}
                 style={styles.searchInput}
                 // ADDED EVENT HANDLERS:
