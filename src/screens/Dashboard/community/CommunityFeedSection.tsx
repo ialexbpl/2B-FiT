@@ -1,5 +1,5 @@
 // CommunityFeedSection.tsx - WITH PAGER VIEW SUPPORT
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,12 +15,12 @@ type Props = {
   onEnablePagerView?: () => void;
 };
 
-export const CommunityFeedSection: React.FC<Props> = ({ 
-  availableHeight, 
-  onEnablePagerView 
+export const CommunityFeedSection: React.FC<Props> = ({
+  availableHeight,
+  onEnablePagerView
 }) => {
   const { palette } = useTheme();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const { posts, loading, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
   const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
   const [filteredUsername, setFilteredUsername] = useState<string | null>(null);
@@ -76,6 +76,18 @@ export const CommunityFeedSection: React.FC<Props> = ({
     await refetch();
     setLastRefresh(new Date());
   };
+
+  const visiblePosts = useMemo(() => {
+    const currentUserId = session?.user?.id;
+    let list = posts;
+    if (!filteredUserId && currentUserId) {
+      list = list.filter(p => p.user_id !== currentUserId);
+    }
+    if (filteredUserId) {
+      list = list.filter(p => p.user_id === filteredUserId);
+    }
+    return list;
+  }, [posts, filteredUserId, session?.user?.id]);
 
   const getTimeSinceLastRefresh = () => {
     const now = new Date();
@@ -177,7 +189,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={filteredUserId ? posts.filter(p => p.user_id === filteredUserId) : posts}
+        data={visiblePosts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent

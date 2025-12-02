@@ -3,18 +3,19 @@ import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@context/ThemeContext';
-import PagerView from 'react-native-pager-view';
 
 import { DashboardHome } from './DashboardHome';
 import { UserPostsSection } from './community/UserPostsSection';
 import { CommunityFeedSection } from './community/CommunityFeedSection';
 import { DashboardHeader } from './DashboardHeader';
 
+const PagerView = Platform.OS === 'web' ? null : require('react-native-pager-view').default;
+
 export const Dashboard: React.FC = () => {
   const { palette } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<any>(null);
   const [pagerEnabled, setPagerEnabled] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'home' | 'user-posts' | 'community'>('home');
@@ -33,11 +34,11 @@ export const Dashboard: React.FC = () => {
         'community': 2,
       }[tab];
 
-      if (pagerRef.current && pageIndex !== undefined) {
+      if (PagerView && pagerRef.current && pageIndex !== undefined) {
         pagerRef.current.setPage(pageIndex);
       }
     },
-    []
+    [PagerView]
   );
 
   /** Update active tab when user swipes the pager */
@@ -56,6 +57,35 @@ export const Dashboard: React.FC = () => {
     setPagerEnabled(true);
   }, []);
 
+  const renderActiveContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return <DashboardHome />;
+      case 'user-posts':
+        return <UserPostsSection availableHeight={pageHeight} />;
+      case 'community':
+      default:
+        return (
+          <CommunityFeedSection
+            availableHeight={pageHeight}
+            onEnablePagerView={enablePagerView}
+          />
+        );
+    }
+  };
+
+  // Web fallback: PagerView is native-only, so render active tab directly.
+  if (Platform.OS === 'web' || !PagerView) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+        <DashboardHeader activeTab={activeTab} onTabChange={handleTabChange} />
+        <View style={{ flex: 1 }}>
+          {renderActiveContent()}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <DashboardHeader activeTab={activeTab} onTabChange={handleTabChange} />
@@ -65,9 +95,10 @@ export const Dashboard: React.FC = () => {
         style={{ flex: 1 }}
         initialPage={0}
         onPageSelected={handlePageSelected}
-        scrollEnabled={pagerEnabled}
-        orientation="vertical"
-        overdrag={true}
+        // Disable swipe paging so vertical scrolling inside sections (Home/My Posts/Community) doesn't jump pages.
+        scrollEnabled={false}
+        orientation="horizontal"
+        overdrag={false}
         keyboardDismissMode="on-drag"
       >
       {/* Home section - Page 0 */}

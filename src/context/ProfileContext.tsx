@@ -53,7 +53,14 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
   const [goalWeight, setGoalWeight] = useState(defaultValue.goalWeight);
   const [activityLevel, setActivityLevel] = useState<string | null>(defaultValue.activityLevel);
   const [allergies, setAllergies] = useState<string[]>(defaultValue.allergies);
+  // Avoid auto-upserting defaults for brand-new users until we actually fetched or collected data.
+  const [canAutoSave, setCanAutoSave] = useState(false);
   const { session } = useAuth();
+
+  // Reset autosave gate when user changes
+  useEffect(() => {
+    setCanAutoSave(false);
+  }, [session?.user?.id]);
 
   const refreshProfileSettings = React.useCallback(async () => {
     if (!session?.user) return;
@@ -67,6 +74,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
       if (row.goal_weight_kg != null) setGoalWeight(String(row.goal_weight_kg));
       if (row.activity_level) setActivityLevel(row.activity_level);
       if (Array.isArray(row.allergies)) setAllergies(row.allergies);
+      setCanAutoSave(true); // we have real data, allow syncing further edits
     }
   }, [session?.user?.id]);
 
@@ -103,6 +111,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
   useEffect(() => {
     if (!session?.user) return;
     const timeout = setTimeout(() => {
+      if (!canAutoSave) return;
       upsertProfileSettings(session.user.id, {
         sex,
         age: Number(age) || null,
@@ -124,7 +133,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
       });
     }, 500);
     return () => clearTimeout(timeout);
-  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel, allergies]);
+  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel, allergies, canAutoSave]);
   const value = useMemo<ProfileContextValue>(() => ({
     sex,
     age,
