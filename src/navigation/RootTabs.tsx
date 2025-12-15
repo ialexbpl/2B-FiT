@@ -5,17 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Dashboard } from '@screens/Dashboard/Dashboard';
 import Meals from '@screens/Meals/Meals';
+import RecipeDetailScreen from '@screens/Meals/RecipeDetailScreen';
+import AddRecipeScreen from '@screens/Meals/AddRecipeScreen';
 import { AI } from '@screens/AI/AI';
 import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
 import { Setting } from '@screens/Settings/Setting';
 import Scanner from '@screens/Meals/Scanner/Scanner';
 import UserProfileScreen from '@screens/Dashboard/community/UserProfileScreen';
-
-import { RivalryScreen } from '@screens/Rivalry/RivalryScreen';
-import { LeaderboardScreen } from '@screens/Rivalry/LeaderboardScreen';
-import { ChallengesScreen } from '@screens/Rivalry/ChallengesScreen';
-import { DuelScreen } from '@screens/Rivalry/DuelScreen';
 
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@utils/supabase';
@@ -95,14 +92,14 @@ export function RootTabs() {
         if (!cancelled) {
           const completed = Boolean(
             profile &&
-            profile.sex &&
-            profile.age && profile.age > 0 &&
-            profile.height_cm && profile.height_cm > 0 &&
-            profile.weight_kg && profile.weight_kg > 0 &&
-            profile.goal_weight_kg && profile.goal_weight_kg > 0 &&
-            profile.activity_level &&
-            Array.isArray(profile.allergies) &&
-            profile.allergies.length > 0
+              profile.sex &&
+              profile.age && profile.age > 0 &&
+              profile.height_cm && profile.height_cm > 0 &&
+              profile.weight_kg && profile.weight_kg > 0 &&
+              profile.goal_weight_kg && profile.goal_weight_kg > 0 &&
+              profile.activity_level &&
+              Array.isArray(profile.allergies) &&
+              profile.allergies.length > 0
           );
 
           setHasProfile(completed);
@@ -175,12 +172,12 @@ export function RootTabs() {
           return <Icon name={iconName as any} size={size} color={color} />;
         },
       })}
-    >
+  >
       <Tab.Screen name="Dashboard" component={Dashboard} />
       <Tab.Screen
-        name="Meals"
-        component={Meals}
-        options={{ title: "Meals" }}
+      name="Meals" 
+      component={Meals} 
+      options={{ title: "Meals" }} 
       />
       <Tab.Screen
         name="AI"
@@ -200,7 +197,7 @@ export function RootTabs() {
           tabBarStyle: { display: 'none' },
         }}
       />
-      <Tab.Screen
+        <Tab.Screen
         name="Scanner"
         component={Scanner}
         options={{ tabBarButton: () => null, headerShown: false }}
@@ -213,34 +210,17 @@ export function RootTabs() {
           headerShown: false,
         }}
       />
-      {/* Rivalry Screens */}
       <Tab.Screen
-        name="Rivalry"
-        component={RivalryScreen}
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
         options={{
           tabBarButton: () => null,
           headerShown: false,
         }}
       />
       <Tab.Screen
-        name="Leaderboard"
-        component={LeaderboardScreen}
-        options={{
-          tabBarButton: () => null,
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
-        name="Challenges"
-        component={ChallengesScreen}
-        options={{
-          tabBarButton: () => null,
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
-        name="Duel"
-        component={DuelScreen}
+        name="AddRecipe"
+        component={AddRecipeScreen}
         options={{
           tabBarButton: () => null,
           headerShown: false,
