@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { calculateSummary } from "@utils/mealsApi";
-import type { FoodItem, LogEntry, MealType } from "@models/MealModel";
+import type { LogEntry, MealType } from "@models/MealModel";
 import type { NamedStyles } from "../types";
 
 type Props = {
@@ -72,7 +72,7 @@ export function DiaryTab({ logs, mealTypes, onDeleteLog, onAddFromFoods, styles,
               style={{ alignSelf: "center", padding: 8 }}
               onPress={onAddFromFoods}
             >
-              <Text style={{ color: palette.text, fontWeight: "600" }}>+ Add from foods</Text>
+              <Text style={{ color: palette.text, fontWeight: "600" }}>+ Add from recipes</Text>
             </TouchableOpacity>
           </View>
         );

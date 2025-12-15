@@ -132,9 +132,9 @@ async def chat(request: ChatRequest):
             completion = state["client"].chat.completions.create(
                 model="moonshotai/Kimi-K2-Instruct-0905",
                 messages=[
-                    {"role": "system", "content": "Jesteś ekspertem ds. diety. Pomóż użytkownikowi zrozumieć wynik."},
+                    {"role": "system", "content": "You are a diet and nutrition expert. Help the user understand the result."},
                     *history_messages,
-                    {"role": "user", "content": f"Użytkownik zapytał: {user_input}\nOdpowiedź z datasetu: {best_match['response']}\n\nWyjaśnij to prostym językiem i daj wskazówki praktyczne, nawiązując do wcześniejszych wiadomości."}
+                    {"role": "user", "content": f"The user asked: {user_input}\nDataset response: {best_match['response']}\n\nExplain this in simple terms and provide practical tips, referencing earlier messages if relevant."}
                 ],
             )
             ai_reply = completion.choices[0].message.content
@@ -151,7 +151,7 @@ async def chat(request: ChatRequest):
             completion = state["client"].chat.completions.create(
                 model="moonshotai/Kimi-K2-Instruct-0905",
                 messages=[
-                    {"role": "system", "content": "Jesteś ekspertem ds. diety. Odpowiadasz konkretnie i po polsku."},
+                    {"role": "system", "content": "You are a diet and nutrition expert. Provide clear, helpful, and practical advice."},
                     *history_messages,
                     {"role": "user", "content": user_input}
                 ],

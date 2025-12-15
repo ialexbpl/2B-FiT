@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Dashboard } from '@screens/Dashboard/Dashboard';
 import Meals from '@screens/Meals/Meals';
+import RecipeDetailScreen from '@screens/Meals/RecipeDetailScreen';
+import AddRecipeScreen from '@screens/Meals/AddRecipeScreen';
 import { AI } from '@screens/AI/AI';
 import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';
@@ -203,6 +205,22 @@ export function RootTabs() {
       <Tab.Screen
         name="UserProfileFeed"
         component={UserProfileScreen}
+        options={{
+          tabBarButton: () => null,
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
+        options={{
+          tabBarButton: () => null,
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="AddRecipe"
+        component={AddRecipeScreen}
         options={{
           tabBarButton: () => null,
           headerShown: false,
