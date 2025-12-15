@@ -7,13 +7,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 # -----------------------------
-# 1️⃣ Wczytanie konfiguracji
+# 1️⃣ Load Configuration
 # -----------------------------
 load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if not HF_TOKEN:
-    raise ValueError("❌ Brak tokenu HF_TOKEN w pliku .env! Dodaj: HF_TOKEN=twój_token")
+    raise ValueError("❌ HF_TOKEN not found in .env file! Add: HF_TOKEN=your_token")
 
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
@@ -21,9 +21,9 @@ client = OpenAI(
 )
 
 # -----------------------------
-# 2️⃣ Ładowanie datasetu
+# 2️⃣ Load Dataset
 # -----------------------------
-print("📦 Ładowanie datasetu...")
+print("📦 Loading dataset...")
 dataset = load_dataset("alexjk1m/diet-planning-evaluation-20250531-140436")
 
 train_data = dataset["train"]
@@ -31,18 +31,18 @@ train_data = dataset["train"]
 prompts = [row["Full Prompt"] for row in train_data]
 responses = [row["Model Response"] for row in train_data]
 
-print(f"✅ Wczytano {len(prompts)} rekordów z datasetu.")
+print(f"✅ Loaded {len(prompts)} records from dataset.")
 
 # -----------------------------
-# 3️⃣ Tworzenie embeddingów
+# 3️⃣ Create Embeddings
 # -----------------------------
-print("🧠 Generowanie embeddingów (może chwilę potrwać)...")
+print("🧠 Generating embeddings (this may take a moment)...")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 prompt_embeddings = embedder.encode(prompts, convert_to_tensor=True)
-print("✅ Embeddingi gotowe.\n")
+print("✅ Embeddings ready.\n")
 
 # -----------------------------
-# 4️⃣ Funkcja: wyszukiwanie podobnych wpisów
+# 4️⃣ Function: Search Similar Entries
 # -----------------------------
 def search_similar_prompt(query, top_k=1):
     query_embedding = embedder.encode([query], convert_to_tensor=True)
@@ -58,48 +58,48 @@ def search_similar_prompt(query, top_k=1):
     return results
 
 # -----------------------------
-# 5️⃣ Chat z AI + dataset
+# 5️⃣ Chat with AI + Dataset
 # -----------------------------
 def chat():
-    print("🤖 Witaj w Smart AI ChatBox!")
-    print("Napisz 'exit' aby zakończyć.\n")
+    print("🤖 Welcome to Towbee!")
+    print("Type 'exit' to quit.\n")
 
     while True:
-        user_input = input("Ty: ").strip()
+        user_input = input("You: ").strip()
         if user_input.lower() in ("exit", "quit"):
-            print("👋 Do zobaczenia!")
+            print("👋 Goodbye!")
             break
 
-        # 🔍 Szukamy podobnego wpisu w dataset
+        # 🔍 Search for similar entry in dataset
         results = search_similar_prompt(user_input, top_k=1)
         best_match = results[0]
         similarity = best_match["similarity"]
 
-        if similarity > 0.45:  # jeśli jest wystarczająco podobne
-            print("\n📚 Znaleziono podobny wpis w dataset:")
-            print(f"(Podobieństwo: {similarity:.2f})\n")
-            print("🧠 Fragment z datasetu (Model Response):\n")
+        if similarity > 0.45:  # if similar enough
+            print("\n📚 Found similar entry in dataset:")
+            print(f"(Similarity: {similarity:.2f})\n")
+            print("🧠 Dataset excerpt (Model Response):\n")
             print(best_match["response"])
             print("\n---\n")
 
-            # ✨ AI interpretacja na podstawie znalezionych danych
-            print("🤖 AI (rozszerzona interpretacja):\n")
+            # ✨ Towbee interpretation based on found data
+            print("🤖 Towbee:\n")
             try:
                 completion = client.chat.completions.create(
                     model="moonshotai/Kimi-K2-Instruct-0905",
                     messages=[
-                        {"role": "system", "content": "Jesteś ekspertem ds. diety. Pomóż użytkownikowi zrozumieć wynik."},
-                        {"role": "user", "content": f"Użytkownik zapytał: {user_input}\nOdpowiedź z datasetu: {best_match['response']}\n\nWyjaśnij to prostym językiem i daj wskazówki praktyczne."}
+                        {"role": "system", "content": "You are a diet and nutrition expert. Help the user understand the result."},
+                        {"role": "user", "content": f"The user asked: {user_input}\nDataset response: {best_match['response']}\n\nExplain this in simple terms and provide practical tips."}
                     ],
                 )
                 ai_reply = completion.choices[0].message.content
                 print(ai_reply)
             except Exception as e:
-                print("⚠️ Błąd przy wywołaniu modelu AI:", e)
+                print("⚠️ Error calling AI model:", e)
 
         else:
-            # Brak dopasowania w dataset — pytamy model
-            print("\n🤔 Brak podobnych wpisów w dataset — pytam AI...\n")
+            # No match in dataset — ask Towbee
+            print("\n🤔 No similar entries in dataset — asking Towbee...\n")
             try:
                 completion = client.chat.completions.create(
                     model="moonshotai/Kimi-K2-Instruct-0905",
@@ -107,15 +107,15 @@ def chat():
                         {"role": "user", "content": user_input}
                     ],
                 )
-                print("AI:", completion.choices[0].message.content)
+                print("Towbee:", completion.choices[0].message.content)
             except Exception as e:
-                print("⚠️ Błąd przy wywołaniu AI:", e)
+                print("⚠️ Error calling AI:", e)
 
         print("\n============================\n")
 
 
 # -----------------------------
-# 6️⃣ Uruchomienie chatu
+# 6️⃣ Run Chat
 # -----------------------------
 if __name__ == "__main__":
     chat()

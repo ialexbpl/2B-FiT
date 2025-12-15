@@ -22,6 +22,7 @@ export type Post = {
     full_name: string | null;
     avatar_url: string | null;
   };
+  is_private?: boolean;
   is_liked: boolean;
 };
 
@@ -32,14 +33,29 @@ export const usePosts = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { session } = useAuth();
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFetchingRef = useRef(false);
 
-  const fetchPosts = useCallback(async () => {
+  const lastFetchRef = useRef<number>(0);
+  const cacheRef = useRef<Post[]>([]);
+
+  const fetchPosts = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < 4000) {
+      if (cacheRef.current.length) {
+        setPosts(cacheRef.current);
+        setLoading(false);
+        setRefreshing(false);
+      }
+      return;
+    }
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    lastFetchRef.current = now;
     try {
       console.log('Fetching posts...');
       setErrorMessage(null);
 
       if (!session?.user?.id) {
-        console.log('No user session, setting empty posts');
         setPosts([]);
         setLoading(false);
         return;
@@ -65,12 +81,47 @@ export const usePosts = () => {
       if (likedRes.error) throw likedRes.error;
 
       const likedSet = new Set((likedRes.data || []).map((like: any) => like.post_id));
-      const postsWithLikes = (postsRes.data || []).map(post => ({
-        ...post,
-        is_liked: likedSet.has(post.id),
-      }));
+      const postsRaw = postsRes.data || [];
+      const userIds = Array.from(new Set(postsRaw.map((p: any) => p.user_id)));
+
+      // fetch privacy flags separately (no FK relationship required)
+      let privacyMap: Record<string, boolean> = {};
+      try {
+        if (userIds.length) {
+          const { data: privacyRows } = await supabase
+            .from('profile_settings')
+            .select('id, is_private')
+            .in('id', userIds);
+          if (Array.isArray(privacyRows)) {
+            privacyMap = Object.fromEntries(
+              privacyRows.map((row: any) => [row.id, Boolean(row.is_private)])
+            );
+          }
+        }
+      } catch {
+        // leave map empty; downstream defaults will hide others' posts
+      }
+
+      const currentUserId = session?.user?.id;
+      const postsWithFlags = postsRaw.map(post => {
+        const privacyFlag = privacyMap[post.user_id];
+        const isPrivate =
+          typeof privacyFlag === 'boolean'
+            ? privacyFlag
+            : post.user_id !== currentUserId; // default: hide others if privacy unknown
+        return {
+          ...post,
+          is_private: isPrivate,
+          is_liked: likedSet.has(post.id),
+        };
+      });
+
+      const postsWithLikes = postsWithFlags.filter(
+        p => !p.is_private || p.user_id === currentUserId
+      );
 
       console.log(`Loaded ${postsWithLikes.length} posts`);
+      cacheRef.current = postsWithLikes;
       setPosts(postsWithLikes);
     } catch (error) {
       console.warn('Error fetching posts:', error);
@@ -79,6 +130,7 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isFetchingRef.current = false;
     }
   }, [session?.user?.id]);
 
@@ -142,6 +194,7 @@ export const usePosts = () => {
       setPosts(prev => [
         {
           ...postToAdd,
+          is_private: postToAdd.is_private ?? false,
           is_liked: false,
         },
         ...prev,
@@ -219,10 +272,10 @@ export const usePosts = () => {
   };
 
   // Manual refresh
-  const manualRefresh = async () => {
+  const manualRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchPosts();
-  };
+    await fetchPosts(true);
+  }, [fetchPosts]);
 
   const adjustCommentCount = (postId: string, delta: number) => {
     setPosts(prev =>
@@ -236,13 +289,12 @@ export const usePosts = () => {
 
   useEffect(() => {
     fetchPosts();
-    const intervalId = setInterval(() => {
-      console.log('LOL Auto-refreshing posts...');
-      fetchPosts();
-    }, 30000);
-    refreshIntervalRef.current = intervalId;
-
-    return () => clearInterval(intervalId);
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
   }, [fetchPosts]);
 
   return {

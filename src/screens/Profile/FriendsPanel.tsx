@@ -15,6 +15,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useTheme } from '@context/ThemeContext';
 import { makeProfileStyles } from './ProfileStyles';
 import { useFriends, FriendListEntry } from '@hooks/useFriends';
+import { supabase } from '@utils/supabase';
 
 const fallbackAvatar = require('../../assets/logo.png');
 const PREVIEW_LIMIT = 5;
@@ -36,9 +37,8 @@ const resolveUsername = (profile: { username: string | null }) =>
 
 export const FriendsPanel: React.FC = () => {
   const { palette } = useTheme();
-  const styles = useMemo(() => makeProfileStyles(palette), [palette]);
   const navigation = useNavigation<any>();
-
+  const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
   const {
     searchQuery,
     setSearchQuery,
@@ -159,54 +159,66 @@ export const FriendsPanel: React.FC = () => {
     [removeFriend, safeAction]
   );
 
-  // --- ZMIENIONA FUNKCJA RENDERUJĄCA ---
+  const navigateToProfile = useCallback(
+    async (profile: { id: string; full_name: string | null; username: string | null }) => {
+      if (!profile?.id) return;
+      try {
+        const { data } = await supabase
+          .from('profile_settings')
+          .select('is_private')
+          .eq('id', profile.id)
+          .maybeSingle();
+        const isPrivate = (data as any)?.is_private;
+        if (isPrivate === true) {
+          Alert.alert('Private profile', 'This profile is private.');
+          return;
+        }
+      } catch (e) {
+        // allow navigation on error; posts/profile are server-filtered anyway
+      }
+      setFriendsModalVisible(false);
+      setFinderModalVisible(false);
+      setTimeout(() => {
+        navigation.navigate('UserProfileFeed', {
+          userId: profile.id,
+          username: resolveName(profile),
+          from: 'Profile',
+        });
+      }, 10);
+    },
+    [navigation]
+  );
+
   const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
-    <TouchableOpacity
-      style={styles.friendRow}
-      activeOpacity={0.7}
-      onPress={() => handleOpenChat(item.profile.id)} // Kliknięcie w cały wiersz otwiera czat
-    >
-      <Image
-        source={item.profile.avatar_url ? { uri: item.profile.avatar_url } : fallbackAvatar}
-        style={styles.friendAvatar}
-      />
-      <View style={styles.friendRowInfo}>
-        <Text style={styles.friendRowName}>{resolveName(item.profile)}</Text>
-        <Text style={styles.friendRowMeta}>
-          {resolveUsername(item.profile)} {item.since ? `• od ${formatDate(item.since)}` : ''}
-        </Text>
-      </View>
-      
-      {/* KONTENER PRZYCISKÓW (CZAT + USUŃ OBOK SIEBIE) */}
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        
-        {/* 1. Przycisk Czatu */}
-        <TouchableOpacity
-            // Dodajemy marginRight, aby oddzielić od przycisku usuwania
-            style={[styles.friendGhostButton, { marginRight: 8 }]} 
-            onPress={() => handleOpenChat(item.profile.id)}
-        >
-            <Icon name="chatbubble-ellipses-outline" size={22} color={palette.primary} />
-        </TouchableOpacity>
-
-        {/* 2. Przycisk Usuwania */}
-        <TouchableOpacity
-            style={styles.friendGhostButton}
-            onPress={() => confirmRemoveFriend(item.friendshipId, resolveName(item.profile))}
-            disabled={isFriendshipMutating(item.friendshipId)}
-        >
-            {isFriendshipMutating(item.friendshipId) ? (
-            <ActivityIndicator size="small" color={palette.subText} />
-            ) : (
-            <Icon name="trash-outline" size={20} color="#e11d48" /> 
-            // Użyłem ikony zamiast tekstu 'Remove', żeby pasowało do ikony czatu. 
-            // Jeśli wolisz tekst, odkomentuj poniższą linię i usuń ikonę:
-            // <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
-            )}
-        </TouchableOpacity>
-      </View>
-
-    </TouchableOpacity>
+    <View style={styles.friendRow}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+        onPress={() => navigateToProfile(item.profile)}
+      >
+        <Image
+          source={item.profile.avatar_url ? { uri: item.profile.avatar_url } : fallbackAvatar}
+          style={styles.friendAvatar}
+        />
+        <View style={styles.friendRowInfo}>
+          <Text style={styles.friendRowName}>{resolveName(item.profile)}</Text>
+          <Text style={styles.friendRowMeta}>
+            {resolveUsername(item.profile)} {item.since ? `• since ${formatDate(item.since)}` : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.friendGhostButton}
+        onPress={() => confirmRemoveFriend(item.friendshipId, resolveName(item.profile))}
+        disabled={isFriendshipMutating(item.friendshipId)}
+      >
+        {isFriendshipMutating(item.friendshipId) ? (
+          <ActivityIndicator size="small" color={palette.subText} />
+        ) : (
+          <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 
   const renderFinderRow = ({ profile, relation }: typeof availableCandidates[number]) => {
@@ -224,7 +236,7 @@ export const FriendsPanel: React.FC = () => {
           {disabled ? (
             <ActivityIndicator size="small" color={palette.onPrimary} />
           ) : (
-            <Text style={styles.friendPrimaryButtonText}>Dodaj</Text>
+            <Text style={styles.friendPrimaryButtonText}>Add</Text>
           )}
         </TouchableOpacity>
       );
@@ -239,7 +251,7 @@ export const FriendsPanel: React.FC = () => {
           {disabled ? (
             <ActivityIndicator size="small" color={palette.subText} />
           ) : (
-            <Text style={styles.friendGhostButtonText}>Anuluj</Text>
+            <Text style={styles.friendGhostButtonText}>Cancel</Text>
           )}
         </TouchableOpacity>
       );
@@ -249,7 +261,7 @@ export const FriendsPanel: React.FC = () => {
           onPress={() => handleRespondFromSearch(relation.friendshipId, displayName)}
           style={styles.friendGhostButton}
         >
-          <Text style={styles.friendGhostButtonText}>Odpowiedz</Text>
+          <Text style={styles.friendGhostButtonText}>Respond</Text>
         </TouchableOpacity>
       );
     } else if (relation.type === 'blocked') {
@@ -263,14 +275,20 @@ export const FriendsPanel: React.FC = () => {
 
     return (
       <View style={styles.friendRow}>
-        <Image
-          source={profile.avatar_url ? { uri: profile.avatar_url } : fallbackAvatar}
-          style={styles.friendAvatar}
-        />
-        <View style={styles.friendRowInfo}>
-          <Text style={styles.friendRowName}>{displayName}</Text>
-          <Text style={styles.friendRowMeta}>{resolveUsername(profile)}</Text>
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+          onPress={() => navigateToProfile(profile)}
+        >
+          <Image
+            source={profile.avatar_url ? { uri: profile.avatar_url } : fallbackAvatar}
+            style={styles.friendAvatar}
+          />
+          <View style={styles.friendRowInfo}>
+            <Text style={styles.friendRowName}>{displayName}</Text>
+            <Text style={styles.friendRowMeta}>{resolveUsername(profile)}</Text>
+          </View>
+        </TouchableOpacity>
         <View>{action}</View>
       </View>
     );
@@ -295,16 +313,22 @@ export const FriendsPanel: React.FC = () => {
             </View>
             {acceptanceNotifications.map(item => (
               <View key={item.id} style={styles.friendNotificationRow}>
-                <Image
-                  source={item.other.avatar_url ? { uri: item.other.avatar_url } : fallbackAvatar}
-                  style={styles.friendAvatarSmall}
-                />
-                <View style={styles.friendNotificationText}>
-                  <Text style={styles.friendRowName}>{resolveName(item.other)}</Text>
-                  <Text style={styles.friendRowMeta}>
-                    accepted your invitation • {formatDate(item.responded_at ?? null)}
-                  </Text>
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                  onPress={() => navigateToProfile(item.other)}
+                >
+                  <Image
+                    source={item.other.avatar_url ? { uri: item.other.avatar_url } : fallbackAvatar}
+                    style={styles.friendAvatarSmall}
+                  />
+                  <View style={styles.friendNotificationText}>
+                    <Text style={styles.friendRowName}>{resolveName(item.other)}</Text>
+                    <Text style={styles.friendRowMeta}>
+                      accepted your invitation on {formatDate(item.responded_at ?? null)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => safeAction(() => acknowledgeNotification(item.id))}
                   style={styles.friendNotificationAction}
@@ -326,14 +350,20 @@ export const FriendsPanel: React.FC = () => {
             <Text style={styles.inlineSectionTitle}>Pending invitations</Text>
             {incomingRequests.map(request => (
               <View key={request.id} style={styles.friendRequestRow}>
-                <Image
-                  source={request.other.avatar_url ? { uri: request.other.avatar_url } : fallbackAvatar}
-                  style={styles.friendAvatar}
-                />
-                <View style={styles.friendRowInfo}>
-                  <Text style={styles.friendRowName}>{resolveName(request.other)}</Text>
-                  <Text style={styles.friendRowMeta}>waiting for response</Text>
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                  onPress={() => navigateToProfile(request.other)}
+                >
+                  <Image
+                    source={request.other.avatar_url ? { uri: request.other.avatar_url } : fallbackAvatar}
+                    style={styles.friendAvatar}
+                  />
+                  <View style={styles.friendRowInfo}>
+                    <Text style={styles.friendRowName}>{resolveName(request.other)}</Text>
+                    <Text style={styles.friendRowMeta}>Waiting for response</Text>
+                  </View>
+                </TouchableOpacity>
                 <View style={styles.friendRequestActions}>
                   <TouchableOpacity
                     onPress={() => safeAction(() => declineInvite(request.id))}
@@ -370,11 +400,11 @@ export const FriendsPanel: React.FC = () => {
             friendsPreview.map(entry => {
               const username = resolveUsername(entry.profile);
               return (
-                <TouchableOpacity 
-                    key={entry.friendshipId} 
-                    style={styles.friendPreviewCard}
-                    onPress={() => handleOpenChat(entry.profile.id)}
-                    activeOpacity={0.8}
+                <TouchableOpacity
+                  key={entry.friendshipId}
+                  style={styles.friendPreviewCard}
+                  activeOpacity={0.85}
+                  onPress={() => navigateToProfile(entry.profile)}
                 >
                   <Image
                     source={entry.profile.avatar_url ? { uri: entry.profile.avatar_url } : fallbackAvatar}

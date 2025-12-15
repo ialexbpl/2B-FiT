@@ -1,11 +1,10 @@
-// Dashboard.tsx - pager with Home, My Posts, Community (blog removed)
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+// Dashboard.tsx - pager with Home and Community
+import React, { useState, useRef, useCallback } from 'react';
 import { View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@context/ThemeContext';
 
 import { DashboardHome } from './DashboardHome';
-import { UserPostsSection } from './community/UserPostsSection';
 import { CommunityFeedSection } from './community/CommunityFeedSection';
 import { DashboardHeader } from './DashboardHeader';
 
@@ -18,20 +17,20 @@ export const Dashboard: React.FC = () => {
   const pagerRef = useRef<any>(null);
   const [pagerEnabled, setPagerEnabled] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'home' | 'user-posts' | 'community'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'community'>('home');
 
   const HEADER_HEIGHT = Platform.OS === 'ios' ? 100 : 90;
   const pageHeight = Math.max(480, height - HEADER_HEIGHT - insets.bottom);
 
   /** Change tab via PagerView */
   const handleTabChange = useCallback(
-    (tab: 'home' | 'user-posts' | 'community') => {
+    (tab: 'home' | 'community') => {
       setActiveTab(tab);
+      setPagerEnabled(tab !== 'community');
 
       const pageIndex = {
         'home': 0,
-        'user-posts': 1,
-        'community': 2,
+        'community': 1,
       }[tab];
 
       if (PagerView && pagerRef.current && pageIndex !== undefined) {
@@ -44,7 +43,7 @@ export const Dashboard: React.FC = () => {
   /** Update active tab when user swipes the pager */
   const handlePageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
-    const tabs: ('home' | 'user-posts' | 'community')[] = ['home', 'user-posts', 'community'];
+    const tabs: ('home' | 'community')[] = ['home', 'community'];
     if (pageIndex >= 0 && pageIndex < tabs.length) {
       setActiveTab(tabs[pageIndex]);
       // Disable pager on community page
@@ -61,8 +60,6 @@ export const Dashboard: React.FC = () => {
     switch (activeTab) {
       case 'home':
         return <DashboardHome />;
-      case 'user-posts':
-        return <UserPostsSection availableHeight={pageHeight} />;
       case 'community':
       default:
         return (
@@ -95,8 +92,8 @@ export const Dashboard: React.FC = () => {
         style={{ flex: 1 }}
         initialPage={0}
         onPageSelected={handlePageSelected}
-        // Disable swipe paging so vertical scrolling inside sections (Home/My Posts/Community) doesn't jump pages.
-        scrollEnabled={false}
+        // Disable swipe paging on community page to avoid scroll conflicts.
+        scrollEnabled={pagerEnabled}
         orientation="horizontal"
         overdrag={false}
         keyboardDismissMode="on-drag"
@@ -106,13 +103,8 @@ export const Dashboard: React.FC = () => {
           <DashboardHome />
         </View>
 
-        {/* My Posts section - Page 1 */}
+        {/* Community section - Page 1 */}
         <View key="1" style={{ flex: 1 }}>
-          <UserPostsSection availableHeight={pageHeight} />
-        </View>
-
-        {/* Community section - Page 2 */}
-        <View key="2" style={{ flex: 1 }}>
           <CommunityFeedSection 
             availableHeight={pageHeight} 
             onEnablePagerView={enablePagerView}

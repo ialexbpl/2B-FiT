@@ -5,7 +5,8 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  ScrollView
+  ScrollView,
+  Switch,
 } from 'react-native';
 import { makeProfileStyles } from '../Profile/ProfileStyles';
 import {
@@ -43,6 +44,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     goalWeight,
     activityLevel,
     allergies,
+    isPrivate,
     setSex,
     setAge,
     setHeight,
@@ -50,6 +52,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     setGoalWeight,
     setActivityLevel,
     setAllergies,
+    setIsPrivate,
   } = useProfile();
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -57,6 +60,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   const [draftActivity, setDraftActivity] = useState<string | null>(activityLevel);
   const [draftAllergies, setDraftAllergies] = useState<string[]>(allergies);
   const [draftSex, setDraftSex] = useState<typeof SEX_OPTIONS[number]>(sex);
+  const [draftPrivacy, setDraftPrivacy] = useState<boolean>(isPrivate);
 
   const neutralBorder = palette.border;
   const neutralBackground = palette.card;
@@ -125,8 +129,16 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
         helper: 'Manage list',
         icon: 'leaf-outline',
       },
+      {
+        key: 'privacy',
+        type: 'privacy' as ModalType,
+        label: 'Private profile',
+        value: isPrivate ? 'Enabled' : 'Disabled',
+        helper: 'Hide posts from others',
+        icon: 'lock-closed-outline',
+      },
     ],
-    [sex, age, height, weight, goalWeight, selectedActivity, allergies],
+    [sex, age, height, weight, goalWeight, selectedActivity, allergies, isPrivate],
   );
 
   const openModal = useCallback((type: ModalType) => {
@@ -156,10 +168,13 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
       case 'allergies':
         setDraftAllergies(allergies);
         break;
+      case 'privacy':
+        setDraftPrivacy(isPrivate);
+        break;
     }
 
     setActiveModal(type);
-  }, [activityLevel, age, allergies, goalWeight, height, sex, weight]);
+  }, [activityLevel, age, allergies, goalWeight, height, sex, weight, isPrivate]);
 
   const handleNumericChange = (value: string, maxLength: number) => {
     const numericValue = value.replace(/[^0-9]/g, '').slice(0, maxLength);
@@ -200,6 +215,11 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
       setActiveModal(null);
       return;
     }
+    if (activeModal === 'privacy') {
+      setIsPrivate(draftPrivacy);
+      setActiveModal(null);
+      return;
+    }
 
     const normalized = draftTextValue.trim();
     if (!normalized) {
@@ -235,6 +255,25 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   const renderModalBody = () => {
     if (!activeModal) {
       return null;
+    }
+
+    if (activeModal === 'privacy') {
+      return (
+        <View style={{ paddingVertical: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.optionButtonText, { color: modalTextColor }]}>Private profile</Text>
+            <Switch
+              value={draftPrivacy}
+              onValueChange={setDraftPrivacy}
+              thumbColor={draftPrivacy ? palette.primary : palette.card100}
+              trackColor={{ false: palette.border, true: `${palette.primary}66` }}
+            />
+          </View>
+          <Text style={[styles.modalSubtitle, { marginTop: 12 }]}>
+            Hide your posts and profile details from non-followers.
+          </Text>
+        </View>
+      );
     }
 
     if (activeModal === 'sex') {

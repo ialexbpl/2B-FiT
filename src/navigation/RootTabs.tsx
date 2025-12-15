@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Dashboard } from '@screens/Dashboard/Dashboard';
 import Meals from '@screens/Meals/Meals';
+import RecipeDetailScreen from '@screens/Meals/RecipeDetailScreen';
+import AddRecipeScreen from '@screens/Meals/AddRecipeScreen';
 import { AI } from '@screens/AI/AI';
 import { Stats } from '@screens/Stats/Stats';
 import { Profile } from '@screens/Profile/Profile';

@@ -37,7 +37,7 @@ export const AI: React.FC = () => {
 
     const baseMessages = [...messages, userMsg];
     const loadingId = 'loading-' + Date.now();
-    const loadingMsg: ChatMessage = { id: loadingId, author: 'ai', text: 'Mysle...', time: '' };
+    const loadingMsg: ChatMessage = { id: loadingId, author: 'ai', text: 'Thinking...', time: '' };
 
     setMessages([...baseMessages, loadingMsg]);
     setInput('');

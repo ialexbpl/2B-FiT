@@ -10,32 +10,83 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Linking,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from 'expo-image-picker';
 import { makeProfileStyles } from "./ProfileStyles";
 // theme palettes are provided via ThemeContext
-import { ProfileAchivment } from "./ProfileAchivment";
-import { FriendsPanel } from "./FriendsPanel";
 import { useTheme } from "../../context/ThemeContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { useProfile } from "../../context/ProfileContext";
 import { useAuth } from "@context/AuthContext";
+import { useProfile } from "@context/ProfileContext";
 import { supabase } from "@utils/supabase";
-import type { ModalType } from "@models/ProfileModel";
+import { usePosts } from "@hooks/usePosts";
+import { CreatePostModal } from "@screens/Dashboard/community/CreatePostModal";
+import { PostComponent } from "@screens/Dashboard/community/PostComponent";
+import { CommentsSheet } from "@screens/Dashboard/community/CommentsSheet";
+import type { Post as LegacyPost } from "@screens/Dashboard/community/community.types";
+import { useFriends } from "@hooks/useFriends";
+import { FriendsPanel } from "./FriendsPanel";
+import { ProfileAchivment } from "./ProfileAchivment";
 
 const fallbackAvatar = require("../../assets/logo.png");
 
 export const Profile: React.FC = () => {
   const { palette } = useTheme();
+  const neutralBackground = palette.card;
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { age, height, weight, goalWeight, activityLevel, allergies } = useProfile();
   const { profile, session, refreshProfile } = useAuth();
+  const { age, sex, height, weight, goalWeight, activityLevel, isPrivate } = useProfile();
+
+
+  const bioMeta = React.useMemo(() => {
+    const items: string[] = [];
+    const ageNum = Number(age);
+    if (!Number.isNaN(ageNum) && ageNum > 0) items.push(`Age: ${ageNum}`);
+    if (sex) items.push(`Sex: ${sex}`);
+    const heightNum = Number(height);
+    if (!Number.isNaN(heightNum) && heightNum > 0) items.push(`Height: ${heightNum} cm`);
+    const weightNum = Number(weight);
+    if (!Number.isNaN(weightNum) && weightNum > 0) items.push(`Weight: ${weightNum} kg`);
+    const goalNum = Number(goalWeight);
+    if (!Number.isNaN(goalNum) && goalNum > 0) items.push(`Goal: ${goalNum} kg`);
+    if (activityLevel) items.push(`Activity: ${activityLevel}`);
+    return items;
+  }, [age, sex, height, weight, goalWeight, activityLevel]);
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
   const [nameModalVisible, setNameModalVisible] = React.useState(false);
   const [nameInput, setNameInput] = React.useState('');
   const [nameError, setNameError] = React.useState<string | null>(null);
   const [isSavingName, setIsSavingName] = React.useState(false);
+  const [bioModalVisible, setBioModalVisible] = React.useState(false);
+  const [bioInput, setBioInput] = React.useState('');
+  const [hashtagsInput, setHashtagsInput] = React.useState('');
+  const [igInput, setIgInput] = React.useState('');
+  const [fbInput, setFbInput] = React.useState('');
+  const [bioError, setBioError] = React.useState<string | null>(null);
+  const [isSavingBio, setIsSavingBio] = React.useState(false);
+  const {
+    posts,
+    loading: postsLoading,
+    likePost,
+    deletePost,
+    refetch: refetchPosts,
+    adjustCommentCount,
+  } = usePosts();
+  const {
+    friendCount,
+    incomingRequests,
+    acceptanceNotifications,
+  } = useFriends();
+  const [createModalVisible, setCreateModalVisible] = React.useState(false);
+  const [detailPost, setDetailPost] = React.useState<LegacyPost | null>(null);
+  const [commentPostId, setCommentPostId] = React.useState<string | null>(null);
+  const [friendsVisible, setFriendsVisible] = React.useState(false);
+  const [notificationsVisible, setNotificationsVisible] = React.useState(false);
+  const [refreshingUI, setRefreshingUI] = React.useState(false);
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
 
   const displayName = React.useMemo(() => {
@@ -62,6 +113,12 @@ export const Profile: React.FC = () => {
     }
     return fallbackAvatar;
   }, [profile?.avatar_url]);
+
+  const meta = session?.user?.user_metadata as any;
+  const bioText = meta?.bio?.trim() || 'Dodaj krótki opis o sobie.';
+  const hashtagsText = meta?.hashtags?.trim() || '';
+  const igText = meta?.instagram?.trim() || '';
+  const fbText = meta?.facebook?.trim() || '';
 
   const openNameModal = React.useCallback(() => {
     if (!session?.user) {
@@ -190,127 +247,412 @@ export const Profile: React.FC = () => {
     }
   }, [refreshProfile, session?.user?.id]);
 
+  React.useEffect(() => {
+    setBioInput(bioText);
+    setHashtagsInput(hashtagsText);
+    setIgInput(igText);
+    setFbInput(fbText);
+  }, [bioText, hashtagsText, igText, fbText]);
 
-  const highlightItems = React.useMemo(
-    () => [
-      {
-        key: 'age',
-        label: 'Age',
-        value: age ? `${age} years` : 'Not set',
-        icon: 'calendar-outline',
-        targetModal: 'age' as ModalType,
-      },
-      {
-        key: 'height',
-        label: 'Height',
-        value: height ? `${height} cm` : 'Not set',
-        icon: 'body-outline',
-        targetModal: 'height' as ModalType,
-      },
-      {
-        key: 'weight',
-        label: 'Weight',
-        value: weight ? `${weight} kg` : 'Not set',
-        icon: 'barbell-outline',
-        targetModal: 'weight' as ModalType,
-      },
-      {
-        key: 'goalWeight',
-        label: 'Target',
-        value: goalWeight ? `${goalWeight} kg` : 'Not set',
-        icon: 'flag-outline',
-        targetModal: 'goal' as ModalType,
-      },
-      {
-        key: 'activityLevel',
-        label: 'Activity',
-        value: activityLevel ?? 'Choose level',
-        icon: 'pulse-outline',
-        targetModal: 'activity' as ModalType,
-      },
-      {
-        key: 'allergies',
-        label: 'Allergies',
-        value: allergies.length ? allergies.join(', ') : 'No allergies',
-        icon: 'leaf-outline',
-        targetModal: 'allergies' as ModalType,
-      },
-    ],
-    [activityLevel, age, allergies, goalWeight, height, weight],
+  // Refresh posts when privacy mode changes to reflect visibility
+  React.useEffect(() => {
+    refetchPosts();
+  }, [isPrivate, refetchPosts]);
+
+  const handleRefreshUI = React.useCallback(async () => {
+    setRefreshingUI(true);
+    try {
+      await Promise.all([refetchPosts(), refreshProfile?.()]);
+    } finally {
+      setRefreshingUI(false);
+    }
+  }, [refetchPosts, refreshProfile]);
+
+  const saveBio = React.useCallback(async () => {
+    if (!session?.user) {
+      Alert.alert('Not logged in', 'Sign in to edit your bio.');
+      return;
+    }
+    setIsSavingBio(true);
+    setBioError(null);
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          bio: bioInput.trim(),
+          hashtags: hashtagsInput.trim(),
+          instagram: igInput.trim(),
+          facebook: fbInput.trim(),
+        },
+      });
+      await supabase.auth.getSession();
+      setBioModalVisible(false);
+    } catch (e: any) {
+      setBioError(e?.message ?? 'Failed to save bio.');
+    } finally {
+      setIsSavingBio(false);
+    }
+  }, [bioInput, hashtagsInput, igInput, fbInput, session?.user]);
+
+  const userPosts = React.useMemo(
+    () => posts.filter(post => post.user_id === session?.user?.id),
+    [posts, session?.user?.id]
   );
 
-  const handleInfoCardPress = React.useCallback(
-    (target?: ModalType) => {
-      if (!target) return;
-      navigation.navigate('Settings', { focusModal: target });
+  const totalLikes = React.useMemo(
+    () => userPosts.reduce((acc, post) => acc + (post.likes_count || 0), 0),
+    [userPosts]
+  );
+  const totalComments = React.useMemo(
+    () => userPosts.reduce((acc, post) => acc + (post.comments_count || 0), 0),
+    [userPosts]
+  );
+  const notificationsCount = (incomingRequests?.length || 0) + (acceptanceNotifications?.length || 0);
+
+  const convertToLegacyPost = React.useCallback(
+    (post: any): LegacyPost => {
+      const isSelf = post.user_id === session?.user?.id;
+      const avatar = post.user?.avatar_url || (isSelf ? profile?.avatar_url : undefined);
+      return {
+        id: post.id,
+        user: {
+          id: post.user?.id || post.user_id || session?.user?.id || 'unknown',
+          username: post.user?.full_name || post.user?.username || displayName,
+          avatar,
+          isVerified: false,
+        },
+        content: post.content,
+        image: post.image_url,
+        likes: post.likes_count || 0,
+        comments: [],
+        commentsCount: post.comments_count || 0,
+        timestamp: post.created_at,
+        isLiked: post.is_liked || false,
+        type: post.post_type,
+        metrics: {
+          calories: post.calories || undefined,
+          duration: post.duration || undefined,
+          distance: post.distance || undefined,
+          weight: post.weight || undefined,
+        },
+      };
     },
-    [navigation],
+    [displayName, profile?.avatar_url, session?.user?.id]
   );
+
+
+  const handleOpenLink = React.useCallback((value: string) => {
+    const safe = value.startsWith('http') ? value : `https://${value.replace(/^@/, '')}`;
+    Linking.openURL(safe).catch(() => {
+      Alert.alert('Link', safe);
+    });
+  }, []);
 
   const headerContent = (
-    <>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
-          <Icon name="settings-outline" size={26} color={palette.text} />
-        </TouchableOpacity>
-        {/* Add a simple placeholder to avoid RN source errors */}
-        <TouchableOpacity
-          style={styles.avatarWrapper}
-          onPress={handleAvatarPress}
-          activeOpacity={0.8}
-          disabled={isUploadingAvatar}
-        >
-          <Image source={avatarSource} style={styles.avatar} />
-          {isUploadingAvatar && (
-            <View style={styles.avatarUploading}>
-              <ActivityIndicator color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={openNameModal} activeOpacity={0.8}>
-          <Text style={styles.name}>{displayName}</Text>
-        </TouchableOpacity>
-        <Text style={styles.email}>{displayEmail}</Text>
-      </View>
+    <View style={styles.sectionCombined}>
+      <View style={styles.headerRow}>
+        <View style={styles.topRightIcons}>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => setNotificationsVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Icon name="notifications-outline" size={22} color={palette.text} />
+            {notificationsCount > 0 && (
+              <View style={styles.badgeDot} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
+            <Icon name="settings-outline" size={22} color={palette.text} />
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Information</Text>
-        <View style={styles.infoGrid}>
-          {highlightItems.map(({ key, label, value, icon, targetModal }) => (
-            <TouchableOpacity
-              key={key}
-              style={styles.infoCard}
-              onPress={() => handleInfoCardPress(targetModal)}
-              activeOpacity={0.85}
-            >
-              <View style={styles.infoIconWrapper}>
-                <Icon name={icon} size={20} color={palette.primary} />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.avatarWrapper}
+            onPress={handleAvatarPress}
+            activeOpacity={0.8}
+            disabled={isUploadingAvatar}
+          >
+            <Image source={avatarSource} style={styles.avatarLarge} />
+            {isUploadingAvatar && (
+              <View style={styles.avatarUploading}>
+                <ActivityIndicator color="#fff" />
               </View>
-              <View style={styles.infoTextWrapper}>
-                <Text style={styles.infoLabel}>{label}</Text>
-                <Text style={[styles.infoValue, { color: palette.subText }]}>{value}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openNameModal} activeOpacity={0.8}>
+            <Text style={styles.name}>{displayName}</Text>
+          </TouchableOpacity>
+          <Text style={styles.email}>{displayEmail}</Text>
         </View>
       </View>
 
-      <FriendsPanel />
-      <ProfileAchivment />
-    </>
-  );
+      <View style={styles.statRow}>
+        <TouchableOpacity style={styles.statItem} onPress={() => setFriendsVisible(true)} activeOpacity={0.85}>
+          <Text style={styles.statNumber}>{friendCount}</Text>
+          <Text style={styles.statLabel}>Friends</Text>
+        </TouchableOpacity>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{totalLikes}</Text>
+          <Text style={styles.statLabel}>Likes</Text>
+        </View>
+        <TouchableOpacity style={styles.statItem} onPress={() => setCommentPostId(userPosts[0]?.id || null)} activeOpacity={0.85}>
+          <Text style={styles.statNumber}>{totalComments}</Text>
+          <Text style={styles.statLabel}>Comments</Text>
+        </TouchableOpacity>
+      </View>
 
+      <View style={styles.bioBlockFlat}>
+        <View style={styles.bioHeader}>
+          <Text style={styles.bioTitle}>Bio</Text>
+        </View>
+        <TouchableOpacity onPress={() => { setBioModalVisible(true); setBioError(null); }} activeOpacity={0.85}>
+          <Text style={styles.bioText}>{bioText}</Text>
+        </TouchableOpacity>
+        {bioMeta.length ? (
+          <View style={styles.bioMetaRow}>
+            {bioMeta.map(item => (
+              <View key={item} style={styles.bioMetaPill}>
+                <Text style={styles.bioMetaText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {hashtagsText ? (
+          <View style={styles.hashtagsRow}>
+            {hashtagsText.split(/\\s+/).filter(Boolean).map(tag => (
+              <Text key={tag} style={styles.hashtagChip}>{tag.startsWith('#') ? tag : `#${tag}`}</Text>
+            ))}
+          </View>
+        ) : null}
+        {(igText || fbText) ? (
+          <View style={styles.linksRow}>
+            {igText ? (
+              <TouchableOpacity
+                style={styles.linkPill}
+                onPress={() => handleOpenLink(igText)}
+                activeOpacity={0.8}
+              >
+                <Icon name="logo-instagram" size={16} color={palette.primary} />
+                <Text style={styles.linkText}>{igText}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {fbText ? (
+              <TouchableOpacity
+                style={styles.linkPill}
+                onPress={() => handleOpenLink(fbText)}
+                activeOpacity={0.8}
+              >
+                <Icon name="logo-facebook" size={16} color={palette.primary} />
+                <Text style={styles.linkText}>{fbText}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={[styles.sectionTitle, { marginTop: 14, marginBottom: 10 }]}>My posts</Text>
+
+      {postsLoading ? (
+        <View style={styles.postsEmpty}>
+          <ActivityIndicator color={palette.primary} />
+          <Text style={styles.emptyText}>Loading your posts...</Text>
+        </View>
+      ) : userPosts.length === 0 ? (
+        <View style={styles.postsEmpty}>
+          <Icon name="camera-outline" size={36} color={palette.subText} />
+          <Text style={[styles.emptyText, { marginTop: 6 }]}>No posts yet. Share your fitness journey!</Text>
+          <TouchableOpacity
+            style={[styles.postsActionButton, { paddingHorizontal: 16, paddingVertical: 10, marginTop: 8 }]}
+            onPress={() => setCreateModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Icon name="add" size={18} color={palette.primary} />
+            <Text style={[styles.postsActionText, { color: palette.primary }]}>Create post</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.postsGrid}>
+          {userPosts.map((post, idx) => (
+            <View
+              key={post.id}
+              style={[
+                styles.postTile,
+                (idx % 2 === 0) && { marginRight: '4%' },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setDetailPost(convertToLegacyPost(post))}
+              >
+                {post.image_url ? (
+                  <Image source={{ uri: post.image_url }} style={styles.postTileImage} />
+                ) : (
+                  <View style={styles.postTileFallback}>
+                    <Text style={styles.postTileFallbackText} numberOfLines={3}>
+                      {post.content}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.commentBar}
+                activeOpacity={0.85}
+                onPress={() => setCommentPostId(post.id)}
+              >
+                <Icon name="chatbubble-ellipses-outline" size={14} color={palette.subText} />
+                <Text style={styles.commentBarText}>{post.comments_count || 0} comments</Text>
+                <Text style={styles.commentBarAction}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <FlatList
         data={[]}
         renderItem={() => null}
         ListHeaderComponent={headerContent}
+        ListFooterComponent={() => (
+          <View style={styles.achievementsWrapper}>
+            <ProfileAchivment />
+          </View>
+        )}
         keyExtractor={(_, index) => `profile-static-${index}`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         style={{ backgroundColor: palette.background }}
       />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setCreateModalVisible(true)}
+        activeOpacity={0.85}
+      >
+        <Icon name="add" size={28} color={palette.onPrimary} />
+      </TouchableOpacity>
+
+      <CreatePostModal
+        visible={createModalVisible}
+        onClose={() => {
+          setCreateModalVisible(false);
+          refetchPosts();
+        }}
+        onCreated={() => refetchPosts()}
+      />
+
+      <Modal
+        visible={!!detailPost}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetailPost(null)}
+      >
+        <View style={styles.postModalOverlay}>
+          <View style={[styles.postModalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+            <View style={styles.postModalHeader}>
+              <Text style={[styles.modalTitle, { color: palette.text }]}>Post details</Text>
+              <TouchableOpacity onPress={() => setDetailPost(null)}>
+                <Icon name="close" size={22} color={palette.text} />
+              </TouchableOpacity>
+            </View>
+            {detailPost ? (
+              <PostComponent
+                post={detailPost}
+                onLike={() => {
+                  likePost(detailPost.id);
+                  setDetailPost(current =>
+                    current ? { ...current, isLiked: !current.isLiked, likes: current.isLiked ? current.likes - 1 : current.likes + 1 } : current
+                  );
+                }}
+                onComment={(postId) => {
+                  setDetailPost(null); // close detail so comments sheet can slide in reliably
+                  setTimeout(() => setCommentPostId(postId), 10);
+                }}
+                onDelete={async (postId) => {
+                  try {
+                    await deletePost(postId);
+                    setDetailPost(null);
+                    refetchPosts();
+                  } catch (err: any) {
+                    Alert.alert('Delete failed', err?.message ?? 'Could not delete post right now.');
+                  }
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <CommentsSheet
+        visible={!!commentPostId}
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
+        onCommentAdded={() => {
+          if (commentPostId) {
+            adjustCommentCount(commentPostId, 1);
+          }
+        }}
+      />
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={notificationsVisible}
+        onRequestClose={() => setNotificationsVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { paddingTop: insets.top + 20 }]}>
+           <View style={[styles.modalCard, { backgroundColor: palette.background, borderColor: palette.border, maxHeight: '70%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: palette.text }]}>Notifications</Text>
+              <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
+                <Icon name="close" size={20} color={palette.text} />
+              </TouchableOpacity>
+            </View>
+            {notificationsCount === 0 ? (
+              <Text style={[styles.emptyText, { textAlign: 'center', paddingVertical: 12 }]}>
+                No friend invites right now.
+              </Text>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {incomingRequests.map(req => (
+                  <View key={`req-${req.id}`} style={styles.notificationItem}>
+                    <Icon name="person-add-outline" size={18} color={palette.primary} />
+                    <Text style={{ marginLeft: 8, color: palette.text }}>
+                      {req.other.full_name || req.other.username || 'User'} sent you an invite
+                    </Text>
+                  </View>
+                ))}
+                {acceptanceNotifications?.map(note => (
+                  <View key={`acc-${note.id}`} style={styles.notificationItem}>
+                    <Icon name="checkmark-circle-outline" size={18} color={palette.primary} />
+                    <Text style={{ marginLeft: 8, color: palette.text }}>
+                      {note.other.full_name || note.other.username || 'User'} accepted your invite
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal animationType="slide" visible={friendsVisible} onRequestClose={() => setFriendsVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: palette.background, padding: 16, paddingTop: insets.top + 16 }}>
+          <View style={styles.modalHeaderRow}>
+            <Text style={[styles.modalTitle, { color: palette.text }]}>Friends</Text>
+            <TouchableOpacity onPress={() => setFriendsVisible(false)}>
+              <Icon name="close" size={22} color={palette.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1, marginTop: 8 }}>
+            <FriendsPanel />
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         transparent
@@ -348,6 +690,72 @@ export const Profile: React.FC = () => {
                   <ActivityIndicator color={palette.onPrimary} />
                 ) : (
                   <Text style={styles.modalPrimaryButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={bioModalVisible}
+        onRequestClose={() => setBioModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+            <Text style={[styles.modalTitle, { color: palette.text }]}>Edytuj bio</Text>
+            <Text style={styles.modalSubtitle}>Dodaj opis, hashtagi i linki.</Text>
+            <TextInput
+              value={bioInput}
+              onChangeText={setBioInput}
+              placeholder="Bio"
+              placeholderTextColor={palette.subText}
+              style={[styles.modalInput, { minHeight: 80, textAlignVertical: 'top' }]}
+              multiline
+            />
+            <TextInput
+              value={hashtagsInput}
+              onChangeText={setHashtagsInput}
+              placeholder="Hashtagi (np. #fitness #dieta)"
+              placeholderTextColor={palette.subText}
+              style={styles.modalInput}
+            />
+            <TextInput
+              value={igInput}
+              onChangeText={setIgInput}
+              placeholder="Instagram (link lub @username)"
+              placeholderTextColor={palette.subText}
+              style={styles.modalInput}
+              autoCapitalize="none"
+            />
+            <TextInput
+              value={fbInput}
+              onChangeText={setFbInput}
+              placeholder="Facebook (link)"
+              placeholderTextColor={palette.subText}
+              style={styles.modalInput}
+              autoCapitalize="none"
+            />
+            {bioError ? <Text style={{ color: '#ef4444', marginTop: 8 }}>{bioError}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setBioModalVisible(false)}
+                style={[styles.modalButton, { borderColor: palette.border, backgroundColor: palette.card }]}
+                disabled={isSavingBio}
+              >
+                <Text style={[styles.modalButtonText, { color: palette.text }]}>Anuluj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveBio}
+                style={[styles.modalButton, styles.modalPrimaryButton]}
+                disabled={isSavingBio}
+              >
+                {isSavingBio ? (
+                  <ActivityIndicator color={palette.onPrimary} />
+                ) : (
+                  <Text style={styles.modalPrimaryButtonText}>Zapisz</Text>
                 )}
               </TouchableOpacity>
             </View>
