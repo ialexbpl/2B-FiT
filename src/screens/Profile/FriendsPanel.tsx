@@ -11,7 +11,7 @@ import {
   FlatList,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useTheme } from '@context/ThemeContext';
 import { makeProfileStyles } from './ProfileStyles';
 import { useFriends, FriendListEntry } from '@hooks/useFriends';
@@ -36,7 +36,9 @@ const resolveUsername = (profile: { username: string | null }) =>
 
 export const FriendsPanel: React.FC = () => {
   const { palette } = useTheme();
-  const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
+  const styles = useMemo(() => makeProfileStyles(palette), [palette]);
+  const navigation = useNavigation<any>();
+
   const {
     searchQuery,
     setSearchQuery,
@@ -143,8 +145,19 @@ export const FriendsPanel: React.FC = () => {
     [removeFriend, safeAction]
   );
 
-  const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
-    <View style={styles.friendRow}>
+const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
+  <TouchableOpacity
+    style={styles.friendRow}
+    activeOpacity={0.85}
+    onPress={() =>
+      navigation.navigate('Profile', { // 1. NAZWA DOCELOWEGO TABA
+        screen: 'UserChatScreen', // 2. NAZWA EKRANU W TYM TABIE (W ProfileStack)
+        params: { 
+          friendId: item.profile.id, // 3. PARAMETRY DLA EKRANU DOCELOWEGO
+        },
+      })
+    }
+  >
       <Image
         source={item.profile.avatar_url ? { uri: item.profile.avatar_url } : fallbackAvatar}
         style={styles.friendAvatar}
@@ -166,7 +179,7 @@ export const FriendsPanel: React.FC = () => {
           <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderFinderRow = ({ profile, relation }: typeof availableCandidates[number]) => {
