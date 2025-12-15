@@ -79,6 +79,20 @@ export const FriendsPanel: React.FC = () => {
     }
   }, []);
 
+  // --- FUNKCJA NAWIGACJI DO CZATU ---
+  const handleOpenChat = useCallback((friendId: string) => {
+    // Zamknij modal, aby po powrocie z czatu nie zasłaniał ekranu
+    setFriendsModalVisible(false);
+    
+    // Nawigacja do innego Taba (Profile) i zagnieżdżonego ekranu (UserChatScreen)
+    navigation.navigate('Profile', { 
+      screen: 'UserChatScreen',
+      params: { 
+        friendId: friendId,
+      },
+    });
+  }, [navigation]);
+
   const friendsPreview = useMemo(() => friends.slice(0, PREVIEW_LIMIT), [friends]);
 
   const filteredFriends = useMemo(() => {
@@ -145,19 +159,13 @@ export const FriendsPanel: React.FC = () => {
     [removeFriend, safeAction]
   );
 
-const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
-  <TouchableOpacity
-    style={styles.friendRow}
-    activeOpacity={0.85}
-    onPress={() =>
-      navigation.navigate('Profile', { // 1. NAZWA DOCELOWEGO TABA
-        screen: 'UserChatScreen', // 2. NAZWA EKRANU W TYM TABIE (W ProfileStack)
-        params: { 
-          friendId: item.profile.id, // 3. PARAMETRY DLA EKRANU DOCELOWEGO
-        },
-      })
-    }
-  >
+  // --- ZMIENIONA FUNKCJA RENDERUJĄCA ---
+  const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
+    <TouchableOpacity
+      style={styles.friendRow}
+      activeOpacity={0.7}
+      onPress={() => handleOpenChat(item.profile.id)} // Kliknięcie w cały wiersz otwiera czat
+    >
       <Image
         source={item.profile.avatar_url ? { uri: item.profile.avatar_url } : fallbackAvatar}
         style={styles.friendAvatar}
@@ -168,17 +176,36 @@ const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
           {resolveUsername(item.profile)} {item.since ? `• od ${formatDate(item.since)}` : ''}
         </Text>
       </View>
-      <TouchableOpacity
-        style={styles.friendGhostButton}
-        onPress={() => confirmRemoveFriend(item.friendshipId, resolveName(item.profile))}
-        disabled={isFriendshipMutating(item.friendshipId)}
-      >
-        {isFriendshipMutating(item.friendshipId) ? (
-          <ActivityIndicator size="small" color={palette.subText} />
-        ) : (
-          <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
-        )}
-      </TouchableOpacity>
+      
+      {/* KONTENER PRZYCISKÓW (CZAT + USUŃ OBOK SIEBIE) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        
+        {/* 1. Przycisk Czatu */}
+        <TouchableOpacity
+            // Dodajemy marginRight, aby oddzielić od przycisku usuwania
+            style={[styles.friendGhostButton, { marginRight: 8 }]} 
+            onPress={() => handleOpenChat(item.profile.id)}
+        >
+            <Icon name="chatbubble-ellipses-outline" size={22} color={palette.primary} />
+        </TouchableOpacity>
+
+        {/* 2. Przycisk Usuwania */}
+        <TouchableOpacity
+            style={styles.friendGhostButton}
+            onPress={() => confirmRemoveFriend(item.friendshipId, resolveName(item.profile))}
+            disabled={isFriendshipMutating(item.friendshipId)}
+        >
+            {isFriendshipMutating(item.friendshipId) ? (
+            <ActivityIndicator size="small" color={palette.subText} />
+            ) : (
+            <Icon name="trash-outline" size={20} color="#e11d48" /> 
+            // Użyłem ikony zamiast tekstu 'Remove', żeby pasowało do ikony czatu. 
+            // Jeśli wolisz tekst, odkomentuj poniższą linię i usuń ikonę:
+            // <Text style={[styles.friendGhostButtonText, { color: '#e11d48' }]}>Remove</Text>
+            )}
+        </TouchableOpacity>
+      </View>
+
     </TouchableOpacity>
   );
 
@@ -343,7 +370,12 @@ const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
             friendsPreview.map(entry => {
               const username = resolveUsername(entry.profile);
               return (
-                <View key={entry.friendshipId} style={styles.friendPreviewCard}>
+                <TouchableOpacity 
+                    key={entry.friendshipId} 
+                    style={styles.friendPreviewCard}
+                    onPress={() => handleOpenChat(entry.profile.id)}
+                    activeOpacity={0.8}
+                >
                   <Image
                     source={entry.profile.avatar_url ? { uri: entry.profile.avatar_url } : fallbackAvatar}
                     style={styles.friendAvatarSmall}
@@ -352,7 +384,7 @@ const renderFriendRow = ({ item }: { item: FriendListEntry }) => (
                     <Text style={styles.friendPreviewName}>{resolveName(entry.profile)}</Text>
                     {username ? <Text style={styles.friendPreviewMeta}>{username}</Text> : null}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
