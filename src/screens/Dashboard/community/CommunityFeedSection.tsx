@@ -1,6 +1,6 @@
 // CommunityFeedSection.tsx - WITH PAGER VIEW SUPPORT
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
+import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image, Alert } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
@@ -9,6 +9,7 @@ import { CreatePostModal } from './CreatePostModal';
 import { useAuth } from '@context/AuthContext';
 import { CommentsSheet } from './CommentsSheet';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '@utils/supabase';
 
 type Props = {
   availableHeight: number;
@@ -60,6 +61,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
     timestamp: post.created_at,
     isLiked: post.is_liked || false,
     type: post.post_type,
+    is_private: post.is_private || false,
     metrics: {
       calories: post.calories || undefined,
       duration: post.duration || undefined,
@@ -80,6 +82,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
   const visiblePosts = useMemo(() => {
     const currentUserId = session?.user?.id;
     let list = posts;
+    list = list.filter(p => !p.is_private || p.user_id === currentUserId);
     if (!filteredUserId && currentUserId) {
       list = list.filter(p => p.user_id !== currentUserId);
     }
@@ -196,8 +199,24 @@ export const CommunityFeedSection: React.FC<Props> = ({
             post={convertToLegacyPost(item)}
             onLike={() => likePost(item.id)}
             onComment={handleComment}
-            onUserPress={(userId, username) => {
-              navigation.navigate('UserProfileFeed', { userId, username });
+            onUserPress={async (userId, username) => {
+              if (userId !== session?.user?.id) {
+                try {
+                  const { data } = await supabase
+                    .from('profile_settings')
+                    .select('is_private')
+                    .eq('id', userId)
+                    .maybeSingle();
+                  const isPrivate = (data as any)?.is_private;
+                  if (isPrivate === true) {
+                    Alert.alert('Private profile', 'This user profile is private.');
+                    return;
+                  }
+                } catch (e) {
+                  // allow navigation on error to avoid false positives, posts are already filtered server-side
+                }
+              }
+              navigation.navigate('UserProfileFeed', { userId, username, from: 'Dashboard' });
             }}
           />
         )}
