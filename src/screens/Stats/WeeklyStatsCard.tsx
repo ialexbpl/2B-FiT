@@ -41,14 +41,37 @@ const getDayLabel = (date: Date) => {
   return days[date.getDay()];
 };
 
-const getLast7Days = (): { date: Date; key: string; label: string }[] => {
+const startOfWeekMonday = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(12, 0, 0, 0);
+  const day = d.getDay();
+  const diff = (day + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  return d;
+};
+
+const getWeekDays = (weekOffset: number): { date: Date; key: string; label: string }[] => {
+  const base = new Date();
+  base.setDate(base.getDate() + weekOffset * 7);
+  const start = startOfWeekMonday(base);
+
   const arr: { date: Date; key: string; label: string }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
     arr.push({ date: d, key: getDateKey(d), label: getDayLabel(d) });
   }
   return arr;
+};
+
+const formatRangeLabel = (days: { date: Date }[]) => {
+  const fmt = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}`;
+  };
+  if (!days.length) return '';
+  return `${fmt(days[0].date)} – ${fmt(days[days.length - 1].date)}`;
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(n, max));
@@ -66,28 +89,28 @@ const metricConfig: Record<
 > = {
   steps: {
     title: 'Steps',
-    subtitle: 'Last 7 days',
+    subtitle: 'Week overview',
     icon: 'walk',
     unit: '',
     maxFallback: 10000,
   },
   activeKcal: {
     title: 'Calories',
-    subtitle: 'Last 7 days',
+    subtitle: 'Week overview',
     icon: 'flame',
     unit: 'kcal',
     maxFallback: 600,
   },
   workoutMin: {
     title: 'Exercise',
-    subtitle: 'Last 7 days',
+    subtitle: 'Week overview',
     icon: 'barbell',
     unit: 'min',
     maxFallback: 60,
   },
   waterL: {
     title: 'Water',
-    subtitle: 'Last 7 days',
+    subtitle: 'Week overview',
     icon: 'water',
     unit: 'L',
     maxFallback: 2,
@@ -155,6 +178,7 @@ const WeeklyStatsCard: React.FC = () => {
   const { steps: liveSteps, isAvailable: stepsAvailable } = useSteps(STEP_GOAL_FOR_SYNC);
 
   const [metric, setMetric] = useState<MetricKey>('steps');
+  const [weekView, setWeekView] = useState<0 | -1>(0);
   const [data, setData] = useState<MetricsMap>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -165,7 +189,10 @@ const WeeklyStatsCard: React.FC = () => {
   const [exerciseInput, setExerciseInput] = useState('0');
   const [waterInput, setWaterInput] = useState('0');
 
-  const last7 = useMemo(() => getLast7Days(), []);
+  const thisWeek = useMemo(() => getWeekDays(0), []);
+  const lastWeek = useMemo(() => getWeekDays(-1), []);
+  const shownWeek = useMemo(() => (weekView === 0 ? thisWeek : lastWeek), [weekView, thisWeek, lastWeek]);
+
   const todayKey = useMemo(() => getDateKey(new Date()), []);
 
   const optimalValue = useMemo(() => {
@@ -184,39 +211,56 @@ const WeeklyStatsCard: React.FC = () => {
     }
   }, []);
 
+  const ensureKeys = useCallback(async (base: MetricsMap) => {
+    const next: MetricsMap = { ...base };
+    [...thisWeek, ...lastWeek].forEach(d => {
+      if (!next[d.key]) next[d.key] = emptyDay();
+    });
+    setData(next);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.warn('[WeeklyStatsCard] ensureKeys save error', e);
+    }
+  }, [thisWeek, lastWeek]);
+
   const load = useCallback(async () => {
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setData(JSON.parse(saved));
+        const parsed = JSON.parse(saved) as MetricsMap;
+        await ensureKeys(parsed);
       } else {
         const init: MetricsMap = {};
-        last7.forEach(d => (init[d.key] = emptyDay()));
+        [...thisWeek, ...lastWeek].forEach(d => (init[d.key] = emptyDay()));
         setData(init);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(init));
       }
     } catch (e) {
       console.warn('[WeeklyStatsCard] load error', e);
     }
-  }, [last7]);
+  }, [ensureKeys, thisWeek, lastWeek]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const patchToday = useCallback((patch: Partial<DayMetric>) => {
-    setData(prev => {
-      const current = prev[todayKey] ?? emptyDay();
-      const nextDay: DayMetric = { ...current, ...patch };
-      const next: MetricsMap = { ...prev, [todayKey]: nextDay };
+  const patchToday = useCallback(
+    (patch: Partial<DayMetric>) => {
+      setData(prev => {
+        const current = prev[todayKey] ?? emptyDay();
+        const nextDay: DayMetric = { ...current, ...patch };
+        const next: MetricsMap = { ...prev, [todayKey]: nextDay };
 
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(e =>
-        console.warn('[WeeklyStatsCard] patchToday save error', e)
-      );
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(e =>
+          console.warn('[WeeklyStatsCard] patchToday save error', e)
+        );
 
-      return next;
-    });
-  }, [todayKey]);
+        return next;
+      });
+    },
+    [todayKey]
+  );
 
   const syncTodayCaloriesFromDashboard = useCallback(async () => {
     if (!userId) return;
@@ -285,11 +329,11 @@ const WeeklyStatsCard: React.FC = () => {
   }, [syncTodayStepsFromDashboard]);
 
   const chartData = useMemo(() => {
-    return last7.map(d => {
+    return shownWeek.map(d => {
       const day = data[d.key] ?? emptyDay();
       return { ...d, value: day[metric] ?? 0 };
     });
-  }, [data, last7, metric]);
+  }, [data, shownWeek, metric]);
 
   const maxValue = useMemo(() => {
     const values = chartData.map(x => x.value);
@@ -308,6 +352,48 @@ const WeeklyStatsCard: React.FC = () => {
 
     return Math.max(max, fallback, goalFloor);
   }, [chartData, metric, goalKcal]);
+
+  const computeWeekTotals = useCallback(
+    (week: { key: string }[]) => {
+      const vals = week.map(d => (data[d.key] ?? emptyDay())[metric] ?? 0);
+      const total = vals.reduce((a, b) => a + b, 0);
+      const avg = total / 7;
+      return { total, avg };
+    },
+    [data, metric]
+  );
+
+  const thisWeekStats = useMemo(() => computeWeekTotals(thisWeek), [computeWeekTotals, thisWeek]);
+  const lastWeekStats = useMemo(() => computeWeekTotals(lastWeek), [computeWeekTotals, lastWeek]);
+
+  const delta = useMemo(() => {
+    const diff = thisWeekStats.total - lastWeekStats.total;
+    const base = lastWeekStats.total;
+    const pct = base > 0 ? (diff / base) * 100 : null;
+    return { diff, pct };
+  }, [thisWeekStats.total, lastWeekStats.total]);
+
+  const deltaIcon = useMemo(() => {
+    if (Math.abs(delta.diff) < 1e-9) return 'remove' as const;
+    return delta.diff > 0 ? ('trending-up' as const) : ('trending-down' as const);
+  }, [delta.diff]);
+
+  const deltaText = useMemo(() => {
+    const sign = delta.diff > 0 ? '+' : delta.diff < 0 ? '−' : '';
+    const abs = Math.abs(delta.diff);
+
+    const diffStr =
+      metric === 'waterL'
+        ? `${sign}${formatValue(abs, metric)}`
+        : `${sign}${formatValue(abs, metric)}`;
+
+    const pctStr =
+      delta.pct == null
+        ? ''
+        : ` (${delta.pct > 0 ? '+' : ''}${Math.round(delta.pct)}%)`;
+
+    return `${diffStr}${pctStr}`;
+  }, [delta.diff, delta.pct, metric]);
 
   const openDay = useCallback(
     (dateKey: string) => {
@@ -352,9 +438,9 @@ const WeeklyStatsCard: React.FC = () => {
   }, [closeModal, data, saveAll, selectedKey]);
 
   const cardStyle = {
-    marginHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 18,
+    marginHorizontal: 10,
+    marginTop: 0,
+    marginBottom: 20,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: palette.border,
@@ -362,13 +448,15 @@ const WeeklyStatsCard: React.FC = () => {
     padding: 16,
   } as const;
 
+  const shownRange = useMemo(() => formatRangeLabel(shownWeek), [shownWeek]);
+
   return (
     <View style={cardStyle}>
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
           <Text style={{ color: palette.text, fontSize: 18, fontWeight: '900' }}>Weekly summary</Text>
-          <Text style={{ color: palette.subText, fontSize: 13, marginTop: 2 }}>Tap a bar to edit daily values</Text>
+          <Text style={{ color: palette.subText, fontSize: 13, marginTop: 2 }}>{shownRange}</Text>
         </View>
 
         <View
@@ -387,8 +475,14 @@ const WeeklyStatsCard: React.FC = () => {
         </View>
       </View>
 
-      {/* Segmented control */}
+      {/* Week toggle */}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+        <SegButton label="This week" active={weekView === 0} onPress={() => setWeekView(0)} palette={palette} />
+        <SegButton label="Last week" active={weekView === -1} onPress={() => setWeekView(-1)} palette={palette} />
+      </View>
+
+      {/* Metric segmented control */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
         <SegButton label="Steps" active={metric === 'steps'} onPress={() => setMetric('steps')} palette={palette} />
         <SegButton
           label="Calories"
@@ -420,11 +514,69 @@ const WeeklyStatsCard: React.FC = () => {
         </View>
       </View>
 
+      {/* Comparison row (this week vs last week) */}
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: palette.border,
+          backgroundColor: palette.background,
+          borderRadius: 14,
+          padding: 12,
+          marginBottom: 12,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: palette.subText, fontSize: 12, fontWeight: '800' }}>
+            This week vs last week
+          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons
+              name={deltaIcon}
+              size={16}
+              color={Math.abs(delta.diff) < 1e-9 ? palette.subText : delta.diff > 0 ? palette.primary : theme.colors.danger}
+            />
+            <Text
+              style={{
+                color: Math.abs(delta.diff) < 1e-9 ? palette.subText : delta.diff > 0 ? palette.primary : theme.colors.danger,
+                fontWeight: '900',
+                fontSize: 12,
+              }}
+            >
+              {deltaText} {metricConfig[metric].unit}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.subText, fontSize: 11, fontWeight: '700' }}>This week</Text>
+            <Text style={{ color: palette.text, fontSize: 14, fontWeight: '900', marginTop: 2 }}>
+              {formatValue(thisWeekStats.total, metric)} {metricConfig[metric].unit}
+            </Text>
+            <Text style={{ color: palette.subText, fontSize: 11, marginTop: 2 }}>
+              Avg/day: {formatValue(thisWeekStats.avg, metric)} {metricConfig[metric].unit}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.subText, fontSize: 11, fontWeight: '700' }}>Last week</Text>
+            <Text style={{ color: palette.text, fontSize: 14, fontWeight: '900', marginTop: 2 }}>
+              {formatValue(lastWeekStats.total, metric)} {metricConfig[metric].unit}
+            </Text>
+            <Text style={{ color: palette.subText, fontSize: 11, marginTop: 2 }}>
+              Avg/day: {formatValue(lastWeekStats.avg, metric)} {metricConfig[metric].unit}
+            </Text>
+          </View>
+        </View>
+      </View>
+
       {/* Bars */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 6 }}>
         {chartData.map(item => {
           const value = item.value ?? 0;
           const h = value > 0 ? (value / maxValue) * 92 : 8;
+
           const isToday = item.key === todayKey;
 
           const stepGoal = 6000;
