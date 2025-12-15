@@ -272,10 +272,10 @@ export const usePosts = () => {
   };
 
   // Manual refresh
-  const manualRefresh = async () => {
+  const manualRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchPosts(true);
-  };
+  }, [fetchPosts]);
 
   const adjustCommentCount = (postId: string, delta: number) => {
     setPosts(prev =>
