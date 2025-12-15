@@ -37,25 +37,58 @@ async def lifespan(app: FastAPI):
         api_key=HF_TOKEN,
     )
 
-    # 2. Load Dataset
-    print("📦 Loading dataset...")
-    try:
-        dataset = load_dataset("alexjk1m/diet-planning-evaluation-20250531-140436")
-        train_data = dataset["train"]
-        state["prompts"] = [row["Full Prompt"] for row in train_data]
-        state["responses"] = [row["Model Response"] for row in train_data]
-        print(f"✅ Loaded {len(state['prompts'])} records.")
-    except Exception as e:
-        print(f"❌ Error loading dataset: {e}")
+    # 3. Load Dataset & Embeddings (with Caching)
+    CACHE_FILE = "dataset_cache.pkl"
+    import pickle
 
-    # 3. Load Embeddings
-    print("🧠 Loading embeddings model...")
-    try:
-        state["embedder"] = SentenceTransformer("all-MiniLM-L6-v2")
-        state["prompt_embeddings"] = state["embedder"].encode(state["prompts"], convert_to_tensor=True)
-        print("✅ Embeddings ready.")
-    except Exception as e:
-        print(f"❌ Error loading embeddings: {e}")
+    if os.path.exists(CACHE_FILE):
+        print(f"📦 Found cache '{CACHE_FILE}'. Loading from disk...")
+        try:
+            with open(CACHE_FILE, "rb") as f:
+                cached_data = pickle.load(f)
+                state["prompts"] = cached_data["prompts"]
+                state["responses"] = cached_data["responses"]
+                state["prompt_embeddings"] = cached_data["prompt_embeddings"]
+            
+            # We still need the embedder for the query
+            print("🧠 Loading embeddings model (model only)...")
+            state["embedder"] = SentenceTransformer("all-MiniLM-L6-v2")
+            print("✅ Cache loaded successfully!")
+        except Exception as e:
+            print(f"❌ Error loading cache: {e}. Falling back to full load.")
+            # Fallback will happen if loading fails
+            if os.path.exists(CACHE_FILE):
+                os.remove(CACHE_FILE) 
+
+    # If data is not loaded yet (no cache or cache failed)
+    if not state["prompts"]:
+        print("📦 Loading dataset from HuggingFace...")
+        try:
+            dataset = load_dataset("alexjk1m/diet-planning-evaluation-20250531-140436")
+            train_data = dataset["train"]
+            state["prompts"] = [row["Full Prompt"] for row in train_data]
+            state["responses"] = [row["Model Response"] for row in train_data]
+            print(f"✅ Loaded {len(state['prompts'])} records.")
+        except Exception as e:
+            print(f"❌ Error loading dataset: {e}")
+
+        print("🧠 Loading embeddings model & computing embeddings...")
+        try:
+            state["embedder"] = SentenceTransformer("all-MiniLM-L6-v2")
+            state["prompt_embeddings"] = state["embedder"].encode(state["prompts"], convert_to_tensor=True)
+            print("✅ Embeddings ready.")
+            
+            # Save to cache
+            print(f"💾 Saving cache to '{CACHE_FILE}'...")
+            with open(CACHE_FILE, "wb") as f:
+                pickle.dump({
+                    "prompts": state["prompts"],
+                    "responses": state["responses"],
+                    "prompt_embeddings": state["prompt_embeddings"]
+                }, f)
+            print("✅ Cache saved.")
+        except Exception as e:
+            print(f"❌ Error loading embeddings: {e}")
 
     yield
     # Shutdown logic if needed

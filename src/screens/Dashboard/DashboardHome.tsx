@@ -200,24 +200,28 @@ export const DashboardHome: React.FC = () => {
     }
 
     return (
-      <SectionList
+      <SectionList<UserSearchResult | Gym, SearchSection>
         sections={sections}
-        keyExtractor={(item, index, section) =>
-          section?.title === 'Users'
-            ? `user-${(item as UserSearchResult).id}-${index}`
-            : `gym-${(item as Gym).id}-${index}`
-        }
+        keyExtractor={(item, index) => {
+          // Distinguish based on properties
+          if ('address' in item) {
+            return `gym-${item.id}-${index}`;
+          }
+          return `user-${item.id}-${index}`;
+        }}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item, section }) =>
-          section.title === 'Users'
-            ? renderUserItem(item as UserSearchResult)
-            : (
+        renderItem={({ item, section }) => {
+          if (section.key === 'users') {
+            return renderUserItem(item as UserSearchResult);
+          } else {
+            return (
               <GymListItem
-                gym={item as Gym}
+                gym={item as unknown as Gym}
                 onPress={handleGymPress}
               />
-            )
-        }
+            );
+          }
+        }}
         renderSectionHeader={({ section }) => (
           <Text style={[localStyles.sectionHeader, { color: palette.subText }]}>
             {section.title}
@@ -238,6 +242,38 @@ export const DashboardHome: React.FC = () => {
       </View>
       <SleepChart styles={styles} palette={palette} />
       <FoodIntake styles={styles} palette={palette} />
+
+      {/* Temporary Link to Rivalry Feature */}
+      <View style={{ marginTop: 20 }}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Rivalry')}
+          style={{
+            backgroundColor: palette.card,
+            padding: 16,
+            borderRadius: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: 1,
+            borderColor: palette.border
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: theme.colors.primary + '20',
+              alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Ionicons name="trophy" size={20} color={theme.colors.primary} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Rywalizacja</Text>
+              <Text style={{ fontSize: 13, color: palette.subText }}>Sprawdź rankingi i wyzwania</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={palette.subText} />
+        </TouchableOpacity>
+      </View>
     </>
   );
 

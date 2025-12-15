@@ -45,3 +45,11 @@ tmp/
 # Keys / signing (Android)
 *.keystore
 *.jks
+
+# Python
+__pycache__/
+*.pyc
+
+# Local scripts & cache
+AI_tunnel.bat
+dataset_cache.pkl
