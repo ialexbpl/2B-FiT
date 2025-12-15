@@ -1,10 +1,9 @@
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import React, { useCallback, useState } from 'react';
 import { makeProfileStyles } from './ProfileStyles';
 import { useTheme } from '../../context/ThemeContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 
 const achievements = [
   {
@@ -29,6 +28,7 @@ export const ProfileAchivment: React.FC = () => {
   const [bestSteps, setBestSteps] = useState<{ steps: number; date: string } | null>(null);
   const [streak, setStreak] = useState<{ current: number; best: number } | null>(null);
   const [stepGoal, setStepGoal] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadHighscore = useCallback(async () => {
     try {
@@ -36,35 +36,48 @@ export const ProfileAchivment: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.steps === 'number' && parsed.steps > 0) {
-          setBestSteps({ steps: parsed.steps, date: parsed.date });
+            setBestSteps(prev =>
+              prev?.steps === parsed.steps && prev?.date === parsed.date
+                ? prev
+                : { steps: parsed.steps, date: parsed.date }
+            );
         }
       }
       const streakSaved = await AsyncStorage.getItem('steps:streak');
       if (streakSaved) {
         const parsed = JSON.parse(streakSaved);
         if (parsed && typeof parsed.current === 'number') {
-          setStreak({ current: parsed.current, best: parsed.best || parsed.current });
+            setStreak(prev =>
+              prev?.current === parsed.current && prev?.best === (parsed.best || parsed.current)
+                ? prev
+                : { current: parsed.current, best: parsed.best || parsed.current }
+            );
         }
       }
       const goalSaved = await AsyncStorage.getItem('steps:goal');
       if (goalSaved) {
         const parsedGoal = Number(goalSaved);
         if (Number.isFinite(parsedGoal) && parsedGoal > 0) {
-          setStepGoal(parsedGoal);
+            setStepGoal(prev => (prev === parsedGoal ? prev : parsedGoal));
         }
       }
-    } catch {
-      setBestSteps(null);
-      setStreak(null);
-      setStepGoal(null);
+    } catch (e) {
+      // keep previous values on error to avoid flicker
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadHighscore();
-    }, [loadHighscore])
-  );
+  React.useEffect(() => {
+    loadHighscore();
+  }, [loadHighscore]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadHighscore();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadHighscore]);
 
   const formattedBestDate =
     bestSteps?.date ? new Date(bestSteps.date).toLocaleDateString() : null;
@@ -101,7 +114,24 @@ export const ProfileAchivment: React.FC = () => {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Achievements</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={styles.sectionTitle}>Achievements</Text>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          activeOpacity={0.8}
+          style={{ paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' }}
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color={palette.subText} />
+          ) : (
+            <>
+              <Icon name="refresh" size={16} color={palette.subText} />
+              <Text style={{ color: palette.subText, marginLeft: 6, fontSize: 12 }}>Refresh</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
       <View style={styles.achievementsList}>
         {cards.map(item => (
           <View key={item.key} style={styles.achievementCard}>

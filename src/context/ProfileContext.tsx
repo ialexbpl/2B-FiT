@@ -12,6 +12,7 @@ export type ProfileData = {
   goalWeight: string;
   activityLevel: string | null;
   allergies: string[];
+  isPrivate: boolean;
 };
 
 type ProfileContextValue = ProfileData & {
@@ -22,6 +23,7 @@ type ProfileContextValue = ProfileData & {
   setGoalWeight: (v: string) => void;
   setActivityLevel: (v: string | null) => void;
   setAllergies: (v: string[]) => void;
+  setIsPrivate: (v: boolean) => void;
   refreshProfileSettings: () => Promise<void>;
 };
 
@@ -33,6 +35,7 @@ const defaultValue: ProfileContextValue = {
   goalWeight: '70',
   activityLevel: 'Moderate',
   allergies: [],
+  isPrivate: false,
   setSex: () => {},
   setAge: () => {},
   setHeight: () => {},
@@ -40,6 +43,7 @@ const defaultValue: ProfileContextValue = {
   setGoalWeight: () => {},
   setActivityLevel: () => {},
   setAllergies: () => {},
+  setIsPrivate: () => {},
   refreshProfileSettings: async () => {},
 };
 
@@ -53,6 +57,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
   const [goalWeight, setGoalWeight] = useState(defaultValue.goalWeight);
   const [activityLevel, setActivityLevel] = useState<string | null>(defaultValue.activityLevel);
   const [allergies, setAllergies] = useState<string[]>(defaultValue.allergies);
+  const [isPrivate, setIsPrivate] = useState<boolean>(defaultValue.isPrivate);
   // Avoid auto-upserting defaults for brand-new users until we actually fetched or collected data.
   const [canAutoSave, setCanAutoSave] = useState(false);
   const { session } = useAuth();
@@ -74,6 +79,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
       if (row.goal_weight_kg != null) setGoalWeight(String(row.goal_weight_kg));
       if (row.activity_level) setActivityLevel(row.activity_level);
       if (Array.isArray(row.allergies)) setAllergies(row.allergies);
+      if (typeof (row as any).is_private === 'boolean') setIsPrivate(Boolean((row as any).is_private));
       setCanAutoSave(true); // we have real data, allow syncing further edits
     }
   }, [session?.user?.id]);
@@ -97,6 +103,9 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         if (Array.isArray((cached as any).allergies)) {
          setAllergies((cached as any).allergies);
       }
+        if (typeof (cached as any).is_private === 'boolean') {
+          setIsPrivate(Boolean((cached as any).is_private));
+        }
       }
 
       await refreshProfileSettings();
@@ -120,6 +129,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         goal_weight_kg: Number(goalWeight) || null,
         activity_level: activityLevel as any,
         allergies,
+        is_private: isPrivate,
       }).catch(err => console.error('Failed to save profile settings', err));
       // Also cache locally for offline/startup use
       saveProfileSettingsCache({
@@ -130,10 +140,11 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
         goal_weight_kg: Number(goalWeight) || null,
         activity_level: activityLevel as any,
         allergies,
+        is_private: isPrivate,
       });
     }, 500);
     return () => clearTimeout(timeout);
-  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel, allergies, canAutoSave]);
+  }, [session?.user?.id, sex, age, height, weight, goalWeight, activityLevel, allergies, isPrivate, canAutoSave]);
   const value = useMemo<ProfileContextValue>(() => ({
     sex,
     age,
@@ -142,6 +153,7 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
     goalWeight,
     activityLevel,
     allergies,
+    isPrivate,
     setSex,
     setAge,
     setHeight,
@@ -149,8 +161,9 @@ export const ProfileProvider: React.FC<React.PropsWithChildren> = ({ children })
     setGoalWeight,
     setActivityLevel,
     setAllergies,
+    setIsPrivate,
     refreshProfileSettings,
-  }), [sex, age, height, weight, goalWeight, activityLevel, allergies, refreshProfileSettings]);
+  }), [sex, age, height, weight, goalWeight, activityLevel, allergies, isPrivate, refreshProfileSettings]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };

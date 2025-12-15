@@ -22,12 +22,13 @@ import { supabase } from '@utils/supabase';
 type CreatePostModalProps = {
   visible: boolean;
   onClose: () => void;
+  onCreated?: (postId?: string) => void;
 };
 
 type PostType = 'workout' | 'meal' | 'progress' | 'achievement';
 const DEFAULT_POST_TYPE: PostType = 'progress';
 
-export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClose }) => {
+export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClose, onCreated }) => {
   const { palette } = useTheme();
   const { createPost } = usePosts();
   const { profile } = useAuth();
@@ -159,7 +160,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
         }
       }
 
-      await createPost({
+      const created = await createPost({
         content: content.trim(),
         image_url: imageUrl,
         post_type: DEFAULT_POST_TYPE,
@@ -171,6 +172,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
 
       resetForm();
       onClose();
+      if (created?.id) {
+        onCreated?.(created.id);
+      } else {
+        onCreated?.();
+      }
       Alert.alert('Success', 'Post created successfully!');
     } catch (error) {
       console.error('Error creating post:', error);

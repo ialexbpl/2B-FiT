@@ -275,4 +275,332 @@ fullProductMacroRow: {
   color: palette.text,
   marginTop: 2,
 },
+portionCard: {
+  width: "100%",
+  borderRadius: theme.radius.lg,
+  backgroundColor: palette.card100,
+  padding: theme.spacing(2),
+  ...theme.shadow.sm,
+  marginTop: theme.spacing(2),
+  gap: theme.spacing(1),
+},
+portionTitle: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: palette.text,
+  marginBottom: theme.spacing(0.5),
+},
+portionRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: theme.spacing(1),
+},
+portionLabel: {
+  fontSize: 13,
+  color: palette.subText,
+  fontWeight: "600",
+  marginTop: theme.spacing(0.5),
+},
+portionInput: {
+  minWidth: 110,
+  paddingHorizontal: theme.spacing(1.5),
+  paddingVertical: theme.spacing(1),
+  borderRadius: theme.radius.md,
+  backgroundColor: palette.card,
+  color: palette.text,
+  borderWidth: 1,
+  borderColor: palette.border,
+  textAlign: "center",
+  fontSize: 14,
+  fontWeight: "600",
+},
+
+mealChipsRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: theme.spacing(1),
+  marginTop: theme.spacing(0.75),
+},
+mealChip: {
+  paddingHorizontal: theme.spacing(1.25),
+  paddingVertical: theme.spacing(0.8),
+  borderRadius: theme.radius.lg,
+  backgroundColor: palette.card,
+  borderWidth: 1,
+  borderColor: palette.border,
+},
+mealChipActive: {
+  backgroundColor: palette.primary,
+  borderColor: palette.primary,
+},
+mealChipText: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: palette.text,
+},
+mealChipTextActive: {
+  color: palette.onPrimary,
+},
+
+portionPreview: {
+  marginTop: theme.spacing(1),
+  padding: theme.spacing(1.25),
+  borderRadius: theme.radius.md,
+  backgroundColor: palette.card,
+},
+portionPreviewText: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: palette.text,
+  marginBottom: 2,
+},
+portionPreviewMeta: {
+  fontSize: 13,
+  color: palette.subText,
+  fontWeight: "600",
+},
+portionHint: {
+  marginTop: theme.spacing(0.5),
+  fontSize: 12,
+  color: palette.subText,
+},
+
+addDiaryButton: {
+  marginTop: theme.spacing(1),
+  borderRadius: theme.radius.lg,
+  backgroundColor: palette.primary,
+  paddingVertical: theme.spacing(1.25),
+  justifyContent: "center",
+  alignItems: "center",
+  ...theme.shadow.sm,
+},
+addDiaryButtonDisabled: {
+  opacity: 0.5,
+},
+addDiaryButtonText: {
+  color: palette.onPrimary,
+  fontWeight: "800",
+  fontSize: 14,
+},
+nutritionTitle: {
+  fontSize: 14,
+  fontWeight: "800",
+  color: palette.text,
+  textAlign: "center",
+},
+
+nutritionSubtitle: {
+  marginTop: 2,
+  fontSize: 12,
+  fontWeight: "700",
+  color: palette.subText,
+  textAlign: "center",
+},
+
+nutritionTable: {
+  marginTop: theme.spacing(1.25),
+  borderRadius: theme.radius.md,
+  overflow: "hidden",
+  borderWidth: 1,
+  borderColor: palette.border,
+  backgroundColor: palette.card,
+},
+
+nutritionHeaderRow: {
+  flexDirection: "row",
+  paddingVertical: theme.spacing(1),
+  paddingHorizontal: theme.spacing(1.25),
+  backgroundColor: palette.card100,
+  borderBottomWidth: 1,
+  borderBottomColor: palette.border,
+},
+
+nutritionHeaderCell: {
+  fontSize: 12,
+  fontWeight: "900",
+  color: palette.text,
+},
+
+nutritionRow: {
+  flexDirection: "row",
+  paddingVertical: theme.spacing(0.9),
+  paddingHorizontal: theme.spacing(1.25),
+  borderBottomWidth: 1,
+  borderBottomColor: palette.border,
+  backgroundColor: palette.card,
+},
+
+nutritionCell: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: palette.text,
+},
+
+nutritionCellLeft: {
+  flex: 1,
+  textAlign: "left",
+},
+
+nutritionCellRight: {
+  width: 90,
+  textAlign: "right",
+  color: palette.subText,
+  fontWeight: "800",
+},
+infoCard: {
+  marginTop: theme.spacing(2),
+  width: "100%",
+  borderRadius: theme.radius.lg,
+  backgroundColor: palette.card100,
+  padding: theme.spacing(2),
+  ...theme.shadow.sm,
+},
+
+infoCardHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: theme.spacing(0.75),
+  marginBottom: theme.spacing(1),
+},
+
+infoCardTitle: {
+  fontSize: 14,
+  fontWeight: "800",
+  color: palette.text,
+  textAlign: "center",
+},
+
+infoCardBody: {
+  fontSize: 13,
+  color: palette.subText,
+  lineHeight: 19,
+  textAlign: "left",
+},
+portionSummaryCard: {
+  marginTop: theme.spacing(1),
+  borderRadius: theme.radius.md,
+  backgroundColor: palette.card,
+  padding: theme.spacing(1.5),
+  borderWidth: 1,
+  borderColor: palette.border,
+},
+
+portionSummaryTitle: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: palette.text,
+  textAlign: "center",
+  marginBottom: theme.spacing(1),
+},
+
+portionTable: {
+  borderRadius: theme.radius.sm,
+  overflow: "hidden",
+},
+
+portionRowTable: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  paddingVertical: theme.spacing(0.75),
+  paddingHorizontal: theme.spacing(0.5),
+  borderBottomWidth: 1,
+  borderBottomColor: palette.border,
+},
+
+portionCellLeft: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: palette.text,
+},
+
+portionCellRight: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: palette.primary,
+},
+productHeroCard: {
+  width: "100%",
+  borderRadius: theme.radius.xl,
+  backgroundColor: palette.card100,
+  padding: theme.spacing(2),
+  alignItems: "center",
+  gap: theme.spacing(1.5),
+  ...theme.shadow.md,
+},
+
+productHeroImage: {
+  width: 160,
+  height: 160,
+  borderRadius: theme.radius.lg,
+  backgroundColor: palette.card,
+},
+
+productHeroContent: {
+  width: "100%",
+  alignItems: "center",
+  gap: theme.spacing(0.75),
+},
+
+productHeroTitle: {
+  fontSize: 20,
+  fontWeight: "800",
+  color: palette.text,
+  textAlign: "center",
+},
+
+brandBadge: {
+  paddingHorizontal: theme.spacing(1.25),
+  paddingVertical: theme.spacing(0.4),
+  borderRadius: 999,
+  backgroundColor: palette.primary + "22",
+},
+
+brandBadgeText: {
+  fontSize: 12,
+  fontWeight: "800",
+  color: palette.primary,
+},
+
+productMetaRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: theme.spacing(1),
+  marginTop: theme.spacing(0.25),
+},
+
+kcalBadge: {
+  paddingHorizontal: theme.spacing(1),
+  paddingVertical: theme.spacing(0.4),
+  borderRadius: 999,
+  backgroundColor: palette.card,
+  borderWidth: 1,
+  borderColor: palette.border,
+},
+
+kcalBadgeText: {
+  fontSize: 12,
+  fontWeight: "800",
+  color: palette.text,
+},
+
+productQuantity: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: palette.subText,
+},
+
+nutriChip: {
+  marginTop: theme.spacing(0.5),
+  paddingHorizontal: theme.spacing(1.5),
+  paddingVertical: theme.spacing(0.5),
+  borderRadius: 999,
+},
+
+nutriChipText: {
+  fontSize: 13,
+  fontWeight: "900",
+},
 });

@@ -5,8 +5,8 @@ import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 type DashboardHeaderProps = {
-  activeTab: 'home' | 'user-posts' | 'community';
-  onTabChange: (tab: 'home' | 'user-posts' | 'community') => void;
+  activeTab: 'home' | 'community';
+  onTabChange: (tab: 'home' | 'community') => void;
 };
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ activeTab, onTabChange }) => {
@@ -43,12 +43,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ activeTab, onT
       flex: 1,
     },
     tabText: {
-      fontSize: 11,
+      fontSize: 12,
       marginTop: 4,
-      fontWeight: '400' as const,
+      fontWeight: '500' as const,
     },
     activeTabText: {
-      fontWeight: '600' as const,
+      fontWeight: '700' as const,
     },
   });
 
@@ -72,24 +72,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ activeTab, onT
             activeTab === 'home' && styles.activeTabText
           ]}>
             Dashboard
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => onTabChange('user-posts')}
-        >
-          <Ionicons
-            name="person"
-            size={20}
-            color={activeTab === 'user-posts' ? palette.primary : palette.subText}
-          />
-          <Text style={[
-            styles.tabText,
-            { color: activeTab === 'user-posts' ? palette.primary : palette.subText },
-            activeTab === 'user-posts' && styles.activeTabText
-          ]}>
-            My Posts
           </Text>
         </TouchableOpacity>
 
