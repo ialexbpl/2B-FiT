@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -26,10 +27,49 @@ import {
 import { getScannerStyles } from "./ScannerStyles";
 import { useTheme } from "../../../context/ThemeContext";
 
+import { useAuth } from "@context/AuthContext";
+import { addToLog } from "@utils/mealsApi";
+import type { FoodItem, MealType } from "@models/MealModel";
+import { MEAL_TYPES } from "../useMealsLogic";
+
+function safeNumber(v: any): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function gramsToPortionMultiplier(grams: number) {
+  return grams / 100;
+}
+
+function productToFoodItem(product: Product, grams: number): FoodItem {
+  const m = gramsToPortionMultiplier(grams);
+
+  const calories = safeNumber(product.caloriesPer100g) * m;
+  const protein = safeNumber(product.proteinsPer100g) * m;
+  const carbs = safeNumber(product.carbsPer100g) * m;
+  const fat = safeNumber(product.fatPer100g) * m;
+
+  return {
+    id: `scan-${Date.now()}`,
+    name: product.name || "Scanned product",
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10,
+    vegetarian: false,
+    gluten_free: false,
+    lactose_free: false,
+  } as unknown as FoodItem;
+}
+
 export default function Scanner() {
   const navigation = useNavigation();
   const { palette } = useTheme();
   const styles = getScannerStyles(palette);
+
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  const today = new Date().toISOString().split("T")[0];
 
   const [permission, requestPermission] = useCameraPermissions();
   const [enabled, setEnabled] = useState(true);
@@ -41,6 +81,10 @@ export default function Scanner() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showProductFull, setShowProductFull] = useState(false);
+
+  const [grams, setGrams] = useState<string>("100");
+  const [mealType, setMealType] = useState<MealType>("breakfast");
+  const [adding, setAdding] = useState(false);
 
   const settings: { barcodeTypes: BarcodeType[] } = useMemo(
     () => ({
@@ -113,41 +157,79 @@ export default function Scanner() {
     setProductError(null);
     setShowProductFull(false);
     setSearchQuery("");
+    setGrams("100");
+    setMealType("breakfast");
+    setAdding(false);
   };
 
   function getNutriScoreColor(score?: string): string {
-  if (!score) return palette.text;
-
-  const s = score.toLowerCase();
-
-  switch (s) {
-    case "a":
-      return "#2ecc71";
-    case "b":
-      return "#a3d977";
-    case "c":
-      return "#f1c40f";
-    case "d":
-      return "#e67e22";
-    case "e":
-      return "#e74c3c";
-    default:
-      return palette.text;
+    if (!score) return palette.text;
+    const s = score.toLowerCase();
+    switch (s) {
+      case "a":
+        return "#2ecc71";
+      case "b":
+        return "#a3d977";
+      case "c":
+        return "#f1c40f";
+      case "d":
+        return "#e67e22";
+      case "e":
+        return "#e74c3c";
+      default:
+        return palette.text;
+    }
   }
-}
 
+  const portionPreview = useMemo(() => {
+    if (!product) return null;
+    const g = safeNumber(grams);
+    if (g <= 0) return null;
+
+    const m = gramsToPortionMultiplier(g);
+
+    return {
+      kcal: Math.round(safeNumber(product.caloriesPer100g) * m),
+      protein: Math.round(safeNumber(product.proteinsPer100g) * m * 10) / 10,
+      carbs: Math.round(safeNumber(product.carbsPer100g) * m * 10) / 10,
+      fat: Math.round(safeNumber(product.fatPer100g) * m * 10) / 10,
+    };
+  }, [product, grams]);
+
+  const handleAddToDiary = useCallback(async () => {
+    if (!userId) {
+      Alert.alert("Not logged in", "You need to be logged in to add meals.");
+      return;
+    }
+    if (!product) return;
+
+    const g = safeNumber(grams);
+    if (!Number.isFinite(g) || g <= 0) {
+      Alert.alert("Invalid amount", "Enter a valid grams amount (e.g. 50, 120).");
+      return;
+    }
+
+    try {
+      setAdding(true);
+      const food = productToFoodItem(product, g);
+      await addToLog(userId, today, mealType, food);
+
+      Alert.alert("Added", `Added to: ${MEAL_TYPES.find((t) => t.id === mealType)?.label}`);
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert("Error", "Failed to add scanned product to diary.");
+    } finally {
+      setAdding(false);
+    }
+  }, [userId, product, grams, mealType, today, navigation]);
 
   if (!permission) return <View style={styles.container} />;
 
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
-        <Text style={styles.permissionTitle}>
-          I need camera access to scan barcodes.
-        </Text>
-        <Text style={styles.permissionText}>
-          Camera data is never sent anywhere outside your app.
-        </Text>
+        <Text style={styles.permissionTitle}>I need camera access to scan barcodes.</Text>
+        <Text style={styles.permissionText}>Camera data is never sent anywhere outside your app.</Text>
 
         <Text onPress={requestPermission} style={styles.permissionButtonText}>
           Grant permission
@@ -171,48 +253,134 @@ export default function Scanner() {
 
       {product && showProductFull ? (
         <View style={styles.fullProductWrapper}>
-          <ScrollView
-            contentContainerStyle={styles.fullProductContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.fullProductContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.productHeroCard}>
             {product.imageUrl && (
-              <Image
-                source={{ uri: product.imageUrl }}
-                style={styles.fullProductImage}
-              />
+              <Image source={{ uri: product.imageUrl }} style={styles.productHeroImage} />
             )}
 
-            <Text style={styles.fullProductTitle}>{product.name}</Text>
+            <View style={styles.productHeroContent}>
+              {product.brand && (
+                <View style={styles.brandBadge}>
+                  <Text style={styles.brandBadgeText}>{product.brand}</Text>
+                </View>
+              )}
 
-            {product.brand && (
-              <Text style={styles.fullProductBrand}>{product.brand}</Text>
-            )}
+              <Text style={styles.productHeroTitle}>{product.name}</Text>
 
-            {product.caloriesPer100g != null && (
-              <Text style={styles.fullProductMeta}>
-                {product.caloriesPer100g} kcal / 100g
-              </Text>
-            )}
+              <View style={styles.productMetaRow}>
+                {product.caloriesPer100g != null && (
+                  <View style={styles.kcalBadge}>
+                    <Text style={styles.kcalBadgeText}>
+                      🔥 {product.caloriesPer100g} kcal / 100g
+                    </Text>
+                  </View>
+                )}
 
-            {/* Quantity / package */}
-            {product.quantity && (
-              <Text style={styles.fullProductMeta}>
-                Quantity / package: {product.quantity}
-              </Text>
-            )}
+                {product.quantity && (
+                  <Text style={styles.productQuantity}>
+                    📦 {product.quantity}
+                  </Text>
+                )}
+              </View>
 
-            {/* Nutri-Score */}
-            {product.nutrigrade && (
-              <Text
-                style={[
-                  styles.fullProductNutri,
-                  { color: getNutriScoreColor(product.nutrigrade) },
-                ]}
+              {product.nutrigrade && (
+                <View
+                  style={[
+                    styles.nutriChip,
+                    { backgroundColor: getNutriScoreColor(product.nutrigrade) + "22" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.nutriChipText,
+                      { color: getNutriScoreColor(product.nutrigrade) },
+                    ]}
+                  >
+                    Nutri-Score {product.nutrigrade.toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+
+            <View style={styles.portionCard}>
+              <Text style={styles.portionTitle}>Add to diary</Text>
+
+              <View style={styles.portionRow}>
+                <Text style={styles.portionLabel}>Amount (g)</Text>
+                <TextInput
+                  value={grams}
+                  onChangeText={(t) => setGrams(t.replace(",", "."))}
+                  keyboardType="numeric"
+                  placeholder="e.g. 120"
+                  placeholderTextColor={palette.subText}
+                  style={styles.portionInput}
+                />
+              </View>
+
+              <Text style={styles.portionLabel}>Meal</Text>
+              <View style={styles.mealChipsRow}>
+                {MEAL_TYPES.map((t) => {
+                  const active = t.id === mealType;
+                  return (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => setMealType(t.id)}
+                      style={[styles.mealChip, active && styles.mealChipActive]}
+                    >
+                      <Text style={[styles.mealChipText, active && styles.mealChipTextActive]}>
+                        {t.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {portionPreview ? (
+                <View style={styles.portionSummaryCard}>
+                  <Text style={styles.portionSummaryTitle}>Portion summary</Text>
+
+                  <View style={styles.portionTable}>
+                    <View style={styles.portionRowTable}>
+                      <Text style={styles.portionCellLeft}>Calories</Text>
+                      <Text style={styles.portionCellRight}>{portionPreview.kcal} kcal</Text>
+                    </View>
+
+                    <View style={styles.portionRowTable}>
+                      <Text style={styles.portionCellLeft}>Protein</Text>
+                      <Text style={styles.portionCellRight}>{portionPreview.protein} g</Text>
+                    </View>
+
+                    <View style={styles.portionRowTable}>
+                      <Text style={styles.portionCellLeft}>Carbs</Text>
+                      <Text style={styles.portionCellRight}>{portionPreview.carbs} g</Text>
+                    </View>
+
+                    <View style={styles.portionRowTable}>
+                      <Text style={styles.portionCellLeft}>Fat</Text>
+                      <Text style={styles.portionCellRight}>{portionPreview.fat} g</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.portionHint}>Enter a valid amount to see portion summary.</Text>
+              )}
+
+
+              <Pressable
+                style={[styles.addDiaryButton, (adding || !portionPreview) && styles.addDiaryButtonDisabled]}
+                disabled={adding || !portionPreview}
+                onPress={handleAddToDiary}
               >
-                Nutri-Score: {product.nutrigrade.toUpperCase()}
-              </Text>
-            )}
-
+                {adding ? (
+                  <ActivityIndicator size="small" color={palette.onPrimary} />
+                ) : (
+                  <Text style={styles.addDiaryButtonText}>Add to diary</Text>
+                )}
+              </Pressable>
+            </View>
 
             {/* Macros per 100 g */}
             {(product.fatPer100g != null ||
@@ -221,69 +389,82 @@ export default function Scanner() {
               product.sugarsPer100g != null ||
               product.saltPer100g != null) && (
               <View style={styles.fullProductMacrosCard}>
-                <Text style={styles.fullProductSectionTitle}>
-                  Nutrition facts / 100 g
-                </Text>
-                {product.fatPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    Fat: {product.fatPer100g} g
-                  </Text>
-                )}
-                {product.saturatedFatPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    of which saturated: {product.saturatedFatPer100g} g
-                  </Text>
-                )}
-                {product.carbsPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    Carbohydrates: {product.carbsPer100g} g
-                  </Text>
-                )}
-                {product.sugarsPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    of which sugars: {product.sugarsPer100g} g
-                  </Text>
-                )}
-                {product.proteinsPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    Protein: {product.proteinsPer100g} g
-                  </Text>
-                )}
-                {product.saltPer100g != null && (
-                  <Text style={styles.fullProductMacroRow}>
-                    Salt: {product.saltPer100g} g
-                  </Text>
-                )}
+                <Text style={styles.nutritionTitle}>Nutrition facts</Text>
+                <Text style={styles.nutritionSubtitle}>per 100 g</Text>
+
+                <View style={styles.nutritionTable}>
+                  <View style={styles.nutritionHeaderRow}>
+                    <Text style={[styles.nutritionHeaderCell, styles.nutritionCellLeft]}>Nutrient</Text>
+                    <Text style={[styles.nutritionHeaderCell, styles.nutritionCellRight]}>Value</Text>
+                  </View>
+
+                  {product.fatPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Fat</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.fatPer100g} g</Text>
+                    </View>
+                  )}
+
+                  {product.saturatedFatPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Saturated fat</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.saturatedFatPer100g} g</Text>
+                    </View>
+                  )}
+
+                  {product.carbsPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Carbohydrates</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.carbsPer100g} g</Text>
+                    </View>
+                  )}
+
+                  {product.sugarsPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Sugars</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.sugarsPer100g} g</Text>
+                    </View>
+                  )}
+
+                  {product.proteinsPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Protein</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.proteinsPer100g} g</Text>
+                    </View>
+                  )}
+
+                  {product.saltPer100g != null && (
+                    <View style={styles.nutritionRow}>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellLeft]}>Salt</Text>
+                      <Text style={[styles.nutritionCell, styles.nutritionCellRight]}>{product.saltPer100g} g</Text>
+                    </View>
+                  )}
+                </View>
               </View>
+
             )}
 
-            {/* Ingredients */}
             {product.ingredients && (
-              <View style={styles.fullProductSection}>
-                <Text style={styles.fullProductSectionTitle}>Ingredients</Text>
-                <Text style={styles.fullProductSectionBody}>
-                  {product.ingredients}
-                </Text>
+              <View style={styles.infoCard}>
+                <View style={styles.infoCardHeader}>
+                  <MaterialIcons name="restaurant-menu" size={18} color={palette.subText} />
+                  <Text style={styles.infoCardTitle}>Ingredients</Text>
+                </View>
+
+                <Text style={styles.infoCardBody}>{product.ingredients}</Text>
               </View>
             )}
 
-            {/* Allergens */}
+
             {product.allergens && (
               <View style={styles.fullProductSection}>
                 <Text style={styles.fullProductSectionTitle}>Allergens</Text>
-                <Text style={styles.fullProductSectionBody}>
-                  {product.allergens}
-                </Text>
+                <Text style={styles.fullProductSectionBody}>{product.allergens}</Text>
               </View>
             )}
 
-            <Pressable
-              style={styles.fullProductCloseButton}
-              onPress={handleReset}
-            >
-              <Text style={styles.fullProductCloseButtonText}>
-                Back to scanner
-              </Text>
+            <Pressable style={styles.fullProductCloseButton} onPress={handleReset}>
+              <Text style={styles.fullProductCloseButtonText}>Back to scanner</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -295,14 +476,10 @@ export default function Scanner() {
         >
           <View style={styles.overlayWrapper}>
             <View style={styles.overlayCard}>
-              {/* Info about scanned code */}
               <Text style={styles.codeInfoText}>
-                {last
-                  ? `Code: ${last.data} (${last.type})`
-                  : "Point the camera at a barcode\nor\nsearch by product name."}
+                {last ? `Code: ${last.data} (${last.type})` : "Point the camera at a barcode\nor\nsearch by product name."}
               </Text>
 
-              {/* Search bar by name */}
               <View style={styles.searchRow}>
                 <TextInput
                   value={searchQuery}
@@ -313,58 +490,38 @@ export default function Scanner() {
                   returnKeyType="search"
                   onSubmitEditing={loadProductByName}
                 />
-                <Pressable
-                  style={styles.searchButton}
-                  onPress={loadProductByName}
-                >
+                <Pressable style={styles.searchButton} onPress={loadProductByName}>
                   <Text style={styles.searchButtonText}>Search</Text>
                 </Pressable>
               </View>
 
-              {/* Product loading status */}
               {loadingProduct && (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator size="small" />
-                  <Text style={styles.loadingText}>
-                    Looking up the product...
-                  </Text>
+                  <Text style={styles.loadingText}>Looking up the product...</Text>
                 </View>
               )}
 
-              {/* API error */}
-              {productError && !loadingProduct && (
-                <Text style={styles.errorText}>{productError}</Text>
-              )}
+              {productError && !loadingProduct && <Text style={styles.errorText}>{productError}</Text>}
 
               {product && !loadingProduct && (
                 <View style={styles.productRow}>
-                  {product.imageUrl && (
-                    <Image
-                      source={{ uri: product.imageUrl }}
-                      style={styles.productImage}
-                    />
-                  )}
+                  {product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.productImage} />}
 
                   <View style={styles.productInfo}>
                     <Text style={styles.productTitle} numberOfLines={1}>
                       {product.name}
                     </Text>
-                    {product.brand && (
-                      <Text style={styles.productMeta}>{product.brand}</Text>
-                    )}
+                    {product.brand && <Text style={styles.productMeta}>{product.brand}</Text>}
                     {product.caloriesPer100g != null && (
-                      <Text style={styles.productMeta}>
-                        {product.caloriesPer100g} kcal / 100g
-                      </Text>
+                      <Text style={styles.productMeta}>{product.caloriesPer100g} kcal / 100g</Text>
                     )}
                   </View>
                 </View>
               )}
 
               <Pressable style={styles.rescanButton} onPress={handleReset}>
-                <Text style={styles.rescanButtonText}>
-                  {last ? "Scan again" : "Reset"}
-                </Text>
+                <Text style={styles.rescanButtonText}>{last ? "Scan again" : "Reset"}</Text>
               </Pressable>
             </View>
           </View>
