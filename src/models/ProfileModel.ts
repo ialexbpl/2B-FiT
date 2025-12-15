@@ -6,7 +6,7 @@ export const SEX_OPTIONS = ['Male', 'Female'] as const;
 
 export type Sex = typeof SEX_OPTIONS[number];
 
-export type ModalType = 'age' | 'height' | 'weight' | 'goal' | 'activity' | 'allergies' | 'sex'| null;
+export type ModalType = 'age' | 'height' | 'weight' | 'goal' | 'activity' | 'allergies' | 'sex' | 'privacy' | null;
 
 
 export const modalTitles: Record<Exclude<ModalType, null>, string> = {
@@ -17,6 +17,7 @@ export const modalTitles: Record<Exclude<ModalType, null>, string> = {
   goal: 'Set target weight',
   activity: 'Select activity level',
   allergies: 'Select allergies',
+  privacy: 'Private profile',
 };
 
 export const modalDescriptions: Record<Exclude<ModalType, null>, string> = {
@@ -27,6 +28,7 @@ export const modalDescriptions: Record<Exclude<ModalType, null>, string> = {
   goal: 'Set a target weight that motivates you.',
   activity: 'Pick the activity level that matches your routine.',
   allergies: 'Select ingredients you want us to avoid.',
+  privacy: 'Hide your posts and profile details from non-followers.',
 };
 
 export const modalPlaceholders: Record<'age' | 'height' | 'weight' | 'goal', string> = {

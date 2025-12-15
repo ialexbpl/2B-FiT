@@ -128,6 +128,7 @@ export const DashboardHome: React.FC = () => {
     navigation.navigate('UserProfileFeed', {
       userId: user.id,
       username: user.full_name || user.username,
+      from: 'Dashboard',
     });
   };
 

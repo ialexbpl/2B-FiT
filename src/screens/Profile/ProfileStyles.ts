@@ -195,6 +195,26 @@ export const makeProfileStyles = (palette: Palette) =>
       alignItems: 'center',
       marginBottom: 8,
     },
+    bioMetaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      marginTop: 8,
+    },
+    bioMetaPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: theme.radius.sm,
+      backgroundColor: palette.card100,
+      borderWidth: 1,
+      borderColor: palette.border,
+      margin: 4,
+    },
+    bioMetaText: {
+      color: palette.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
     bioEditText: {
       color: palette.primary,
       fontWeight: '700',

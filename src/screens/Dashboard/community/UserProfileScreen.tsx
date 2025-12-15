@@ -3,22 +3,27 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@context/ThemeContext';
+import { useAuth } from '@context/AuthContext';
 import { usePosts } from '../../../hooks/usePosts';
 import { PostComponent } from './PostComponent';
 import { CommentsSheet } from './CommentsSheet';
 import { fetchUserProfile, type UserProfileDetails } from '../../../api/userService';
+import { supabase } from '@utils/supabase';
 
-type RouteParams = { userId: string; username?: string | null };
+type RouteParams = { userId: string; username?: string | null; from?: string };
 
 export const UserProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { userId, username } = route.params as RouteParams;
+  const { userId, username, from } = route.params as RouteParams;
   const { palette } = useTheme();
+  const { session } = useAuth();
   const { posts, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState(username || 'User');
   const [profileData, setProfileData] = useState<UserProfileDetails | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   const userPosts = useMemo(() => posts.filter(p => p.user_id === userId), [posts, userId]);
   const totalLikes = useMemo(
@@ -47,10 +52,23 @@ export const UserProfileScreen: React.FC = () => {
       }
     };
     loadProfile();
+    const loadPrivacy = async () => {
+      const { data } = await supabase
+        .from('profile_settings')
+        .select('is_private')
+        .eq('id', userId)
+        .maybeSingle();
+      const priv = Boolean((data as any)?.is_private);
+      if (!cancelled) {
+        setIsPrivate(priv);
+        setBlocked(priv && session?.user?.id !== userId);
+      }
+    };
+    loadPrivacy();
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [session?.user?.id, userId]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: palette.background },
@@ -116,15 +134,39 @@ export const UserProfileScreen: React.FC = () => {
     .filter(Boolean)
     .join('  |  ');
 
+  const handleBack = () => {
+    if (from) {
+      navigation.navigate(from as never);
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('Profile' as never);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 6, marginRight: 8 }}>
+        <TouchableOpacity onPress={handleBack} style={{ padding: 6, marginRight: 8 }}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.title}>{displayName}</Text>
       </View>
 
+      {blocked ? (
+        <View style={[styles.profileHeader, { alignItems: 'center' }]}>
+          <View style={styles.profileInfo}>
+            <View style={styles.avatar}>{avatarNode}</View>
+            <Text style={styles.usernameText}>{displayName}</Text>
+          </View>
+          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <Ionicons name="lock-closed-outline" size={28} color={palette.subText} />
+            <Text style={[styles.handleText, { marginTop: 8 }]}>This profile is private.</Text>
+          </View>
+        </View>
+      ) : (
       <View style={styles.profileHeader}>
         <View style={styles.profileInfo}>
           <View style={styles.avatar}>{avatarNode}</View>
@@ -151,48 +193,51 @@ export const UserProfileScreen: React.FC = () => {
           </View>
         </View>
       </View>
+      )}
 
-      <FlatList
-        data={userPosts}
-        keyExtractor={item => item.id}
-        refreshing={refreshing}
-        onRefresh={refetch}
-        renderItem={({ item }) => (
-          <PostComponent
-            post={{
-              id: item.id,
-              user: {
-                id: item.user?.id || item.user_id || userId,
-                username: item.user?.full_name || item.user?.username || displayName,
-                avatar: item.user?.avatar_url,
-                isVerified: false,
-              },
-              content: item.content,
-              image: item.image_url,
-              likes: item.likes_count || 0,
-              comments: [],
-              commentsCount: item.comments_count || 0,
-              timestamp: item.created_at,
-              isLiked: item.is_liked || false,
-              type: item.post_type,
-              metrics: {
-                calories: item.calories || undefined,
-                duration: item.duration || undefined,
-                distance: item.distance || undefined,
-                weight: item.weight || undefined,
-              },
-            }}
-            onLike={() => likePost(item.id)}
-            onComment={(pid) => setCommentPostId(pid)}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="albums-outline" size={48} color={palette.subText} />
-            <Text style={styles.emptyText}>No posts from this user yet.</Text>
-          </View>
-        }
-      />
+      {!blocked && (
+        <FlatList
+          data={userPosts}
+          keyExtractor={item => item.id}
+          refreshing={refreshing}
+          onRefresh={refetch}
+          renderItem={({ item }) => (
+            <PostComponent
+              post={{
+                id: item.id,
+                user: {
+                  id: item.user?.id || item.user_id || userId,
+                  username: item.user?.full_name || item.user?.username || displayName,
+                  avatar: item.user?.avatar_url,
+                  isVerified: false,
+                },
+                content: item.content,
+                image: item.image_url,
+                likes: item.likes_count || 0,
+                comments: [],
+                commentsCount: item.comments_count || 0,
+                timestamp: item.created_at,
+                isLiked: item.is_liked || false,
+                type: item.post_type,
+                metrics: {
+                  calories: item.calories || undefined,
+                  duration: item.duration || undefined,
+                  distance: item.distance || undefined,
+                  weight: item.weight || undefined,
+                },
+              }}
+              onLike={() => likePost(item.id)}
+              onComment={(pid) => setCommentPostId(pid)}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="albums-outline" size={48} color={palette.subText} />
+              <Text style={styles.emptyText}>No posts from this user yet.</Text>
+            </View>
+          }
+        />
+      )}
 
       <CommentsSheet
         visible={!!commentPostId}

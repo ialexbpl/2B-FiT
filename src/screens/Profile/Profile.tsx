@@ -20,6 +20,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "@context/AuthContext";
+import { useProfile } from "@context/ProfileContext";
 import { supabase } from "@utils/supabase";
 import { usePosts } from "@hooks/usePosts";
 import { CreatePostModal } from "@screens/Dashboard/community/CreatePostModal";
@@ -38,6 +39,23 @@ export const Profile: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { profile, session, refreshProfile } = useAuth();
+  const { age, sex, height, weight, goalWeight, activityLevel, isPrivate } = useProfile();
+
+
+  const bioMeta = React.useMemo(() => {
+    const items: string[] = [];
+    const ageNum = Number(age);
+    if (!Number.isNaN(ageNum) && ageNum > 0) items.push(`Age: ${ageNum}`);
+    if (sex) items.push(`Sex: ${sex}`);
+    const heightNum = Number(height);
+    if (!Number.isNaN(heightNum) && heightNum > 0) items.push(`Height: ${heightNum} cm`);
+    const weightNum = Number(weight);
+    if (!Number.isNaN(weightNum) && weightNum > 0) items.push(`Weight: ${weightNum} kg`);
+    const goalNum = Number(goalWeight);
+    if (!Number.isNaN(goalNum) && goalNum > 0) items.push(`Goal: ${goalNum} kg`);
+    if (activityLevel) items.push(`Activity: ${activityLevel}`);
+    return items;
+  }, [age, sex, height, weight, goalWeight, activityLevel]);
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
   const [nameModalVisible, setNameModalVisible] = React.useState(false);
   const [nameInput, setNameInput] = React.useState('');
@@ -68,6 +86,7 @@ export const Profile: React.FC = () => {
   const [commentPostId, setCommentPostId] = React.useState<string | null>(null);
   const [friendsVisible, setFriendsVisible] = React.useState(false);
   const [notificationsVisible, setNotificationsVisible] = React.useState(false);
+  const [refreshingUI, setRefreshingUI] = React.useState(false);
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
 
   const displayName = React.useMemo(() => {
@@ -235,6 +254,20 @@ export const Profile: React.FC = () => {
     setFbInput(fbText);
   }, [bioText, hashtagsText, igText, fbText]);
 
+  // Refresh posts when privacy mode changes to reflect visibility
+  React.useEffect(() => {
+    refetchPosts();
+  }, [isPrivate, refetchPosts]);
+
+  const handleRefreshUI = React.useCallback(async () => {
+    setRefreshingUI(true);
+    try {
+      await Promise.all([refetchPosts(), refreshProfile?.()]);
+    } finally {
+      setRefreshingUI(false);
+    }
+  }, [refetchPosts, refreshProfile]);
+
   const saveBio = React.useCallback(async () => {
     if (!session?.user) {
       Alert.alert('Not logged in', 'Sign in to edit your bio.');
@@ -376,6 +409,15 @@ export const Profile: React.FC = () => {
         <TouchableOpacity onPress={() => { setBioModalVisible(true); setBioError(null); }} activeOpacity={0.85}>
           <Text style={styles.bioText}>{bioText}</Text>
         </TouchableOpacity>
+        {bioMeta.length ? (
+          <View style={styles.bioMetaRow}>
+            {bioMeta.map(item => (
+              <View key={item} style={styles.bioMetaPill}>
+                <Text style={styles.bioMetaText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {hashtagsText ? (
           <View style={styles.hashtagsRow}>
             {hashtagsText.split(/\\s+/).filter(Boolean).map(tag => (
@@ -500,6 +542,7 @@ export const Profile: React.FC = () => {
           setCreateModalVisible(false);
           refetchPosts();
         }}
+        onCreated={() => refetchPosts()}
       />
 
       <Modal
