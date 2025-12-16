@@ -13,6 +13,8 @@ import { Profile } from '@screens/Profile/Profile';
 import { Setting } from '@screens/Settings/Setting';
 import Scanner from '@screens/Meals/Scanner/Scanner';
 import UserProfileScreen from '@screens/Dashboard/community/UserProfileScreen';
+import ChatList from '@screens/Chat/ChatList';
+import ChatThread from '@screens/Chat/ChatThread';
 
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@utils/supabase';
@@ -195,6 +197,24 @@ export function RootTabs() {
         options={{
           tabBarButton: () => null,
           tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name="ChatList"
+        component={ChatList}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="ChatThread"
+        component={ChatThread}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
         }}
       />
         <Tab.Screen

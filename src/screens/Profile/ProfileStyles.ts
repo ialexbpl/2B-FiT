@@ -31,6 +31,10 @@ export const makeProfileStyles = (palette: Palette) =>
       padding: 6,
       position: 'relative',
     },
+    chatButton: {
+      padding: 6,
+      marginLeft: 4,
+    },
     badgeDot: {
       position: 'absolute',
       top: 4,
