@@ -20,6 +20,7 @@ import { StepsCard } from './StepsCard';
 import { WeightCard } from './WeightCard';
 import { SleepChart } from './SleepChart';
 import { FoodIntake } from './FoodIntake';
+import { WaterIntakeCard } from './WaterIntakeCard';
 
 import { fetchGyms } from '../../api/gymService';
 import { Gym } from '../../models/GymModels';
@@ -239,6 +240,7 @@ export const DashboardHome: React.FC = () => {
       </View>
       <SleepChart styles={styles} palette={palette} />
       <FoodIntake styles={styles} palette={palette} />
+      <WaterIntakeCard styles={styles} palette={palette} />
     </>
   );
 
