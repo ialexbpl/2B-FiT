@@ -79,20 +79,6 @@ export const FriendsPanel: React.FC = () => {
     }
   }, []);
 
-  // --- FUNKCJA NAWIGACJI DO CZATU ---
-  const handleOpenChat = useCallback((friendId: string) => {
-    // Zamknij modal, aby po powrocie z czatu nie zasłaniał ekranu
-    setFriendsModalVisible(false);
-    
-    // Nawigacja do innego Taba (Profile) i zagnieżdżonego ekranu (UserChatScreen)
-    navigation.navigate('Profile', { 
-      screen: 'UserChatScreen',
-      params: { 
-        friendId: friendId,
-      },
-    });
-  }, [navigation]);
-
   const friendsPreview = useMemo(() => friends.slice(0, PREVIEW_LIMIT), [friends]);
 
   const filteredFriends = useMemo(() => {
