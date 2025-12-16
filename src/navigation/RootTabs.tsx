@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack'; // <-- WYMAGANE DO CZATU
 import { ActivityIndicator, Pressable, View, Platform, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -13,13 +14,12 @@ import { Profile } from '@screens/Profile/Profile';
 import { Setting } from '@screens/Settings/Setting';
 import Scanner from '@screens/Meals/Scanner/Scanner';
 import UserProfileScreen from '@screens/Dashboard/community/UserProfileScreen';
+import UserChatScreen from '@screens/Profile/UserChatScreen'; // <-- IMPORTUJEMY CZAT
 
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@utils/supabase';
 import { fetchProfileSettings } from '@utils/profileSettingsApi';
 import SurveyScreen from '@screens/Login/Onboarding/SurveyScreen';
-
-
 /*
   Bottom tabs (my main navigation)
   - Order: Dashboard, Meals, AI (center, floating), Stats, Profile.
@@ -27,8 +27,33 @@ import SurveyScreen from '@screens/Login/Onboarding/SurveyScreen';
   - The AI tab is a custom raised button to make it stand out.
   - Kept headers off here; screens will add their own UI as needed.
 */
-
 const Tab = createBottomTabNavigator();
+const DashboardStack = createStackNavigator(); // <-- Kontener dla Dashboardu
+const ProfileStack = createStackNavigator();  
+
+// --- 1. DEFINICJA STACKA DASHBOARD (Dzięki temu działa otwieranie profili znajomych) ---
+const DashboardStackNavigator = () => (
+    <DashboardStack.Navigator screenOptions={{ headerShown: false }}>
+        <DashboardStack.Screen name="DashboardMain" component={Dashboard} /> 
+        <DashboardStack.Screen 
+            name="UserProfileFeed" 
+            component={UserProfileScreen} 
+            options={{ headerShown: true, title: 'Profil Użytkownika' }}
+        />
+    </DashboardStack.Navigator>
+);
+
+// --- 2. DEFINICJA STACKA PROFILE (Dzięki temu działa Czat) ---
+const ProfileStackNavigator = () => (
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+        <ProfileStack.Screen name="ProfileMain" component={Profile} /> 
+        <ProfileStack.Screen 
+            name="UserChatScreen" 
+            component={UserChatScreen} 
+            options={{ headerShown: true, title: 'Czat' }}
+        />
+    </ProfileStack.Navigator>
+);
 
 function AITabButton({ onPress, accessibilityState }: any) {
   const { theme, palette } = useTheme();
@@ -77,9 +102,7 @@ export function RootTabs() {
 
     const loadProfile = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           if (!cancelled) {
             setHasProfile(false);
@@ -107,7 +130,6 @@ export function RootTabs() {
       } catch (e) {
         console.warn('Failed to fetch profile settings', e);
         if (!cancelled) {
-          // If we cannot load settings, force onboarding to collect required data
           setHasProfile(false);
         }
       } finally {
@@ -125,25 +147,14 @@ export function RootTabs() {
 
   if (checkingProfile) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: palette.background,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
+      <View style={{ flex: 1, backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
 
   if (!hasProfile) {
-    return (
-      <SurveyScreen
-        onCompleted={() => setHasProfile(true)}
-      />
-    );
+    return <SurveyScreen onCompleted={() => setHasProfile(true)} />;
   }
 
   return (
@@ -172,13 +183,19 @@ export function RootTabs() {
           return <Icon name={iconName as any} size={size} color={color} />;
         },
       })}
-  >
-      <Tab.Screen name="Dashboard" component={Dashboard} />
-      <Tab.Screen
-      name="Meals" 
-      component={Meals} 
-      options={{ title: "Meals" }} 
+    >
+      {}
+      <Tab.Screen 
+        name="Dashboard" 
+        component={DashboardStackNavigator} 
+        options={{ unmountOnBlur: true }} 
       />
+    
+      <Tab.Screen
+        name="Meals" 
+        component={Meals} 
+        options={{ title: "Meals", unmountOnBlur: true }} 
+      />    
       <Tab.Screen
         name="AI"
         component={AI}
@@ -187,8 +204,19 @@ export function RootTabs() {
           tabBarLabel: 'AI',
         }}
       />
-      <Tab.Screen name="Stats" component={Stats} />
-      <Tab.Screen name="Profile" component={Profile} />
+      
+      <Tab.Screen 
+        name="Stats" 
+        component={Stats} 
+        options={{ unmountOnBlur: true }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileStackNavigator} 
+        options={{ unmountOnBlur: true }}
+      />
+
+      {/* --- UKRYTE EKRANY TECHNICZNE --- */}
       <Tab.Screen
         name="Settings"
         component={Setting}
@@ -202,30 +230,9 @@ export function RootTabs() {
         component={Scanner}
         options={{ tabBarButton: () => null, headerShown: false }}
       />
-      <Tab.Screen
-        name="UserProfileFeed"
-        component={UserProfileScreen}
-        options={{
-          tabBarButton: () => null,
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
-        name="RecipeDetail"
-        component={RecipeDetailScreen}
-        options={{
-          tabBarButton: () => null,
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
-        name="AddRecipe"
-        component={AddRecipeScreen}
-        options={{
-          tabBarButton: () => null,
-          headerShown: false,
-        }}
-      />
+      
+      {
+      }
     </Tab.Navigator>
   );
 }
