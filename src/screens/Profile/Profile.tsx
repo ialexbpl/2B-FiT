@@ -361,6 +361,13 @@ export const Profile: React.FC = () => {
               <View style={styles.badgeDot} />
             )}
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.chatButton}
+            onPress={() => navigation.navigate('ChatList')}
+            activeOpacity={0.85}
+          >
+            <Icon name="chatbubble-ellipses-outline" size={22} color={palette.text} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
             <Icon name="settings-outline" size={22} color={palette.text} />
           </TouchableOpacity>

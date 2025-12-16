@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@context/ThemeContext';
@@ -24,6 +24,7 @@ export const UserProfileScreen: React.FC = () => {
   const [profileData, setProfileData] = useState<UserProfileDetails | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const isSelf = session?.user?.id === userId;
 
   const userPosts = useMemo(() => posts.filter(p => p.user_id === userId), [posts, userId]);
   const totalLikes = useMemo(
@@ -39,6 +40,19 @@ export const UserProfileScreen: React.FC = () => {
   useEffect(() => {
     if (username) setDisplayName(username);
   }, [username]);
+
+  const openChat = useCallback(() => {
+    if (!session?.user?.id) {
+      Alert.alert('Sign in required', 'You need to be logged in to start a chat.');
+      return;
+    }
+    if (isSelf) return;
+    navigation.navigate('ChatThread', {
+      userId,
+      username: profileData?.username ?? username ?? displayName,
+      full_name: profileData?.full_name ?? displayName,
+    });
+  }, [session?.user?.id, isSelf, navigation, userId, profileData?.username, profileData?.full_name, username, displayName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,15 +133,15 @@ export const UserProfileScreen: React.FC = () => {
     emptyText: { color: palette.subText, textAlign: 'center', marginTop: 8 },
   }), [palette]);
 
-  const avatarNode = profileData?.avatar_url || userPosts[0]?.user?.avatar_url
-    ? (
-      <Image
-        source={{ uri: profileData?.avatar_url || userPosts[0]?.user?.avatar_url }}
-        style={{ width: 72, height: 72, borderRadius: 36 }}
-      />
-    ) : (
-      <Ionicons name="person" size={48} color={palette.subText} />
-    );
+  const avatarUrl = profileData?.avatar_url || userPosts[0]?.user?.avatar_url || null;
+  const avatarNode = avatarUrl ? (
+    <Image
+      source={{ uri: avatarUrl }}
+      style={{ width: 72, height: 72, borderRadius: 36 }}
+    />
+  ) : (
+    <Ionicons name="person" size={48} color={palette.subText} />
+  );
 
   const bioText = profileData?.bio || 'This user has not added a bio yet.';
   const linksText = [profileData?.hashtags, profileData?.instagram, profileData?.facebook]
@@ -152,7 +166,12 @@ export const UserProfileScreen: React.FC = () => {
         <TouchableOpacity onPress={handleBack} style={{ padding: 6, marginRight: 8 }}>
           <Ionicons name="chevron-back" size={22} color={palette.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>{displayName}</Text>
+        <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{displayName}</Text>
+        {!isSelf ? (
+          <TouchableOpacity onPress={openChat} style={{ padding: 6, marginLeft: 8 }}>
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={palette.text} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {blocked ? (
@@ -208,7 +227,7 @@ export const UserProfileScreen: React.FC = () => {
                 user: {
                   id: item.user?.id || item.user_id || userId,
                   username: item.user?.full_name || item.user?.username || displayName,
-                  avatar: item.user?.avatar_url,
+                  avatar: item.user?.avatar_url || undefined,
                   isVerified: false,
                 },
                 content: item.content,
