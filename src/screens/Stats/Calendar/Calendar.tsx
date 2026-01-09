@@ -419,9 +419,13 @@ const onSave = React.useCallback(async () => {
           <Text style={styles.eventsHeader}>Events</Text>
         </View>
 
+      <View style={{ maxHeight: 200 }}>
         <ScrollView
-          style={{ maxHeight: 200 }}
-          contentContainerStyle={styles.eventsList}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={[styles.eventsList, { paddingBottom: 8 }]}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
         >
           {dayEvents.length === 0 ? (
             <Text style={styles.emptyText}>No events for this day.</Text>
@@ -433,6 +437,8 @@ const onSave = React.useCallback(async () => {
             ))
           )}
         </ScrollView>
+      </View>
+
 
       </View>
 

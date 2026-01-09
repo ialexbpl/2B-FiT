@@ -5,15 +5,15 @@ export const makeCalendarStyles = (palette: Palette, tokens = theme) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: palette.background,
+      backgroundColor: palette.card100 ?? palette.card,
     },
 
     card: {
-      backgroundColor: palette.card,
+      backgroundColor: palette.background,
       borderColor: palette.border,
       borderWidth: 1,
       borderRadius: theme.radius.lg,
-      marginHorizontal: 8,
+      marginHorizontal: 3,
       paddingVertical: 12,
       marginTop: 8,
       paddingBottom: 20,
@@ -128,8 +128,8 @@ export const makeCalendarStyles = (palette: Palette, tokens = theme) =>
     // === FAB ===
     fab: {
       position: 'absolute',
-      right: 18,
-      bottom: 24,
+      right: 10,
+      bottom: 2,
       width: 56,
       height: 56,
       borderRadius: 28,
