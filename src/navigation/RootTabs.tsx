@@ -15,6 +15,10 @@ import Scanner from '@screens/Meals/Scanner/Scanner';
 import UserProfileScreen from '@screens/Dashboard/community/UserProfileScreen';
 import ChatList from '@screens/Chat/ChatList';
 import ChatThread from '@screens/Chat/ChatThread';
+import { RivalryScreen } from '@screens/Rivalry/RivalryScreen';
+import { ChallengesScreen } from '@screens/Rivalry/ChallengesScreen';
+import { LeaderboardScreen } from '@screens/Rivalry/LeaderboardScreen';
+import { DuelScreen } from '@screens/Rivalry/DuelScreen';
 
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '@utils/supabase';
@@ -191,6 +195,42 @@ export function RootTabs() {
       />
       <Tab.Screen name="Stats" component={Stats} />
       <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen
+        name="Rivalry"
+        component={RivalryScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="Challenges"
+        component={ChallengesScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="Duel"
+        component={DuelScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
       <Tab.Screen
         name="Settings"
         component={Setting}

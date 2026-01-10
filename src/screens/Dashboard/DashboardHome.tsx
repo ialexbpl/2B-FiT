@@ -12,6 +12,7 @@ import {
 import { useTheme } from '@context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@context/AuthContext';
 
 import { makeDashboardStyles } from './DashboardStyles';
@@ -234,6 +235,34 @@ export const DashboardHome: React.FC = () => {
 
   const renderDashboardWidgets = () => (
     <>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('Rivalry')}
+        style={{ marginBottom: 16 }}
+      >
+        <LinearGradient
+          colors={[theme.colors.primary, '#16a34a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.rivalryCard}
+        >
+          <View style={styles.rivalryTop}>
+            <View style={styles.rivalryCopy}>
+              <Text style={styles.rivalryTitle}>Rivalry</Text>
+              <Text style={styles.rivalrySubtitle}>
+                Jump into weekly challenges, track your rank, and invite friends to compete.
+              </Text>
+            </View>
+            <View style={styles.rivalryBadge}>
+              <Ionicons name="trophy" size={26} color="#fff" />
+            </View>
+          </View>
+          <View style={styles.rivalryCta}>
+            <Text style={styles.rivalryCtaText}>Open rivalry</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
       <View style={styles.statsRow}>
         <StepsCard styles={styles} palette={palette} />
         <WeightCard styles={styles} palette={palette} />
