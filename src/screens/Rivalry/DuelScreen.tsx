@@ -11,7 +11,7 @@ const { width } = Dimensions.get('window');
 
 export const DuelScreen = ({ route }: any) => {
     const { theme, palette } = useTheme();
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
     const { challengeId, isQuickMatch } = route.params || {};
 
     const [challenge, setChallenge] = React.useState<any>(null);

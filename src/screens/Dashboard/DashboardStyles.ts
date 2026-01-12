@@ -16,6 +16,52 @@ export const makeDashboardStyles = (palette: Palette, tokens = theme) =>
             padding: 16,
         },
 
+        rivalryCard: {
+            borderRadius: tokens.radius.xl,
+            padding: 18,
+            marginBottom: 16,
+            overflow: 'hidden',
+            ...tokens.shadow.md,
+        },
+        rivalryTop: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        rivalryCopy: {
+            flex: 1,
+            marginRight: 12,
+        },
+        rivalryTitle: {
+            color: '#fff',
+            fontSize: 18,
+            fontWeight: '700',
+        },
+        rivalrySubtitle: {
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: 13,
+            lineHeight: 18,
+            marginTop: 4,
+        },
+        rivalryBadge: {
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: 'rgba(255, 255, 255, 0.16)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        rivalryCta: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 14,
+        },
+        rivalryCtaText: {
+            color: '#fff',
+            fontWeight: '700',
+            marginRight: 6,
+            fontSize: 14,
+        },
+
         searchBar: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -240,4 +286,3 @@ export const makeDashboardStyles = (palette: Palette, tokens = theme) =>
             borderBottomColor: 'transparent',
         },
     });
-

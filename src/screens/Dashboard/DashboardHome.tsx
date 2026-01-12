@@ -12,6 +12,7 @@ import {
 import { useTheme } from '@context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@context/AuthContext';
 
 import { makeDashboardStyles } from './DashboardStyles';
@@ -20,6 +21,7 @@ import { StepsCard } from './StepsCard';
 import { WeightCard } from './WeightCard';
 import { SleepChart } from './SleepChart';
 import { FoodIntake } from './FoodIntake';
+import { WaterIntakeCard } from './WaterIntakeCard';
 
 import { fetchGyms } from '../../api/gymService';
 import { Gym } from '../../models/GymModels';
@@ -237,44 +239,41 @@ export const DashboardHome: React.FC = () => {
 
   const renderDashboardWidgets = () => (
     <>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('Rivalry')}
+        style={{ marginBottom: 16 }}
+      >
+        <LinearGradient
+          colors={[theme.colors.primary, '#16a34a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.rivalryCard}
+        >
+          <View style={styles.rivalryTop}>
+            <View style={styles.rivalryCopy}>
+              <Text style={styles.rivalryTitle}>Rivalry</Text>
+              <Text style={styles.rivalrySubtitle}>
+                Jump into weekly challenges, track your rank, and invite friends to compete.
+              </Text>
+            </View>
+            <View style={styles.rivalryBadge}>
+              <Ionicons name="trophy" size={26} color="#fff" />
+            </View>
+          </View>
+          <View style={styles.rivalryCta}>
+            <Text style={styles.rivalryCtaText}>Open rivalry</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
       <View style={styles.statsRow}>
         <StepsCard styles={styles} palette={palette} />
         <WeightCard styles={styles} palette={palette} />
       </View>
       <SleepChart styles={styles} palette={palette} />
       <FoodIntake styles={styles} palette={palette} />
-
-      {/* Temporary Link to Rivalry Feature */}
-      <View style={{ marginTop: 20 }}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Rivalry')}
-          style={{
-            backgroundColor: palette.card,
-            padding: 16,
-            borderRadius: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderWidth: 1,
-            borderColor: palette.border
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{
-              width: 40, height: 40, borderRadius: 20,
-              backgroundColor: theme.colors.primary + '20',
-              alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Ionicons name="trophy" size={20} color={theme.colors.primary} />
-            </View>
-            <View>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Rywalizacja</Text>
-              <Text style={{ fontSize: 13, color: palette.subText }}>Sprawdź rankingi i wyzwania</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color={palette.subText} />
-        </TouchableOpacity>
-      </View>
+      <WaterIntakeCard styles={styles} palette={palette} />
     </>
   );
 
