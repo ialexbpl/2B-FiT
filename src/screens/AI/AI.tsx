@@ -1,5 +1,5 @@
 // src/screens/AI/AI.tsx
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { /* Text, */ ScrollView, KeyboardAvoidingView, Platform, NativeModules } from 'react-native';
 import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +22,7 @@ export const AI: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!input.trim()) return;
 
     const userText = input.trim();
@@ -37,7 +37,7 @@ export const AI: React.FC = () => {
 
     const baseMessages = [...messages, userMsg];
     const loadingId = 'loading-' + Date.now();
-    const loadingMsg: ChatMessage = { id: loadingId, author: 'ai', text: 'Thinking...', time: '' };
+    const loadingMsg: ChatMessage = { id: loadingId, author: 'ai', text: '', time: '' };
 
     setMessages([...baseMessages, loadingMsg]);
     setInput('');
@@ -114,11 +114,11 @@ export const AI: React.FC = () => {
           : msg
       ));
     }
-  };
+  }, [input, messages]);
 
-  const handlePickImage = () => {
+  const handlePickImage = useCallback(() => {
     console.log('Open camera/gallery');
-  };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>

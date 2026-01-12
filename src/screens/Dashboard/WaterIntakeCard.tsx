@@ -26,7 +26,7 @@ const STORAGE_KEY_GLASSES = 'water:glasses';
 const STORAGE_KEY_GOAL = 'water:goal';
 const STORAGE_KEY_DATE = 'water:date';
 
-export const WaterIntakeCard: React.FC<Props> = ({ styles, palette }) => {
+export const WaterIntakeCard: React.FC<Props> = React.memo(({ styles, palette }) => {
     const [glasses, setGlasses] = useState(0);
     const [goalGlasses, setGoalGlasses] = useState(DEFAULT_GOAL_GLASSES);
     const [goalInput, setGoalInput] = useState(String(DEFAULT_GOAL_GLASSES));
@@ -271,14 +271,14 @@ export const WaterIntakeCard: React.FC<Props> = ({ styles, palette }) => {
             </Modal>
         </View>
     );
-};
+});
 
 // Water Glass SVG Component
 const WaterGlass: React.FC<{
     palette: Palette;
     fillPercent: number;
     size: number;
-}> = ({ palette, fillPercent, size }) => {
+}> = React.memo(({ palette, fillPercent, size }) => {
     const clampedFill = Math.max(0, Math.min(fillPercent, 1));
 
     // Glass dimensions relative to size
@@ -357,6 +357,6 @@ const WaterGlass: React.FC<{
             />
         </Svg>
     );
-};
+});
 
 export default WaterIntakeCard;

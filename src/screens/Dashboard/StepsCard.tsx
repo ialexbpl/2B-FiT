@@ -12,7 +12,7 @@ type Props = {
     palette: Palette;
 };
 
-export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
+export const StepsCard: React.FC<Props> = React.memo(({ styles, palette }) => {
     const [goalSteps, setGoalSteps] = useState(10000);
     const [goalInput, setGoalInput] = useState('10000');
     const [goalModalVisible, setGoalModalVisible] = useState(false);
@@ -233,7 +233,7 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
             </Modal>
         </TouchableOpacity>
     );
-};
+});
 
 const RingProgress: React.FC<{
     styles: Styles;
@@ -241,7 +241,7 @@ const RingProgress: React.FC<{
     progress: number;
     current: number;
     goal: number;
-}> = ({ styles, palette, progress, current, goal }) => {
+}> = React.memo(({ styles, palette, progress, current, goal }) => {
     const size = 90;
     const thickness = 8;
     const clamped = Math.max(0, Math.min(progress, 1));
@@ -295,4 +295,4 @@ const RingProgress: React.FC<{
             </View>
         </View>
     );
-};
+});

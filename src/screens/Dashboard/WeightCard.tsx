@@ -11,7 +11,7 @@ type Props = {
     palette: Palette;
 };
 
-export const WeightCard: React.FC<Props> = ({ styles, palette }) => {
+export const WeightCard: React.FC<Props> = React.memo(({ styles, palette }) => {
     const { weight, goalWeight } = useProfile();
 
     const { currentWeight, targetWeight, difference } = useMemo(() => {
@@ -51,4 +51,4 @@ export const WeightCard: React.FC<Props> = ({ styles, palette }) => {
             </View>
         </View>
     );
-};
+});

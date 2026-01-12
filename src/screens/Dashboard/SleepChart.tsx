@@ -57,7 +57,7 @@ const calculateSleepHours = (bedtime: Date, wakeTime: Date): number => {
     return Math.round((diff / (1000 * 60 * 60)) * 10) / 10;
 };
 
-export const SleepChart: React.FC<Props> = ({ styles, palette }) => {
+export const SleepChart: React.FC<Props> = React.memo(({ styles, palette }) => {
     const { isDark } = useTheme();
     const { session } = useAuth();
     const userId = session?.user?.id;
@@ -261,10 +261,10 @@ export const SleepChart: React.FC<Props> = ({ styles, palette }) => {
                                         styles.bar,
                                         {
                                             height: barHeight,
-                                            backgroundColor: item.hours === 0 
-                                                ? palette.border 
-                                                : item.hours >= 7 
-                                                    ? palette.primary 
+                                            backgroundColor: item.hours === 0
+                                                ? palette.border
+                                                : item.hours >= 7
+                                                    ? palette.primary
                                                     : palette.subText,
                                         }
                                     ]}
@@ -402,7 +402,7 @@ export const SleepChart: React.FC<Props> = ({ styles, palette }) => {
                             {/* Buttons */}
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 {sleepData[selectedDate || ''] ? (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={handleDelete}
                                         disabled={isSaving}
                                         style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: theme.radius.sm, backgroundColor: 'rgba(239, 68, 68, 0.1)', opacity: isSaving ? 0.5 : 1 }}
@@ -414,7 +414,7 @@ export const SleepChart: React.FC<Props> = ({ styles, palette }) => {
                                     <TouchableOpacity onPress={closeModal} disabled={isSaving} style={{ paddingVertical: 10, paddingHorizontal: 16, marginRight: 12 }}>
                                         <Text style={{ color: palette.subText, fontWeight: '600', fontSize: 15 }}>Cancel</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={handleSave}
                                         disabled={isSaving}
                                         style={{ paddingVertical: 10, paddingHorizontal: 20, backgroundColor: palette.primary, borderRadius: theme.radius.sm, opacity: isSaving ? 0.5 : 1 }}
@@ -431,4 +431,4 @@ export const SleepChart: React.FC<Props> = ({ styles, palette }) => {
             </Modal>
         </View>
     );
-};
+});
