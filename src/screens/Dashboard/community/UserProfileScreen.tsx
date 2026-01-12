@@ -1,12 +1,11 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@context/ThemeContext';
 import { useAuth } from '@context/AuthContext';
 import { usePosts } from '../../../hooks/usePosts';
 import { PostComponent } from './PostComponent';
-import { CommentsSheet } from './CommentsSheet';
 import { fetchUserProfile, type UserProfileDetails } from '../../../api/userService';
 import { supabase } from '@utils/supabase';
 
@@ -19,12 +18,14 @@ export const UserProfileScreen: React.FC = () => {
   const { palette } = useTheme();
   const { session } = useAuth();
   const { posts, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
-  const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState(username || 'User');
   const [profileData, setProfileData] = useState<UserProfileDetails | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const isSelf = session?.user?.id === userId;
+  const flatListRef = useRef<FlatList>(null);
+  const scrollOffsetRef = useRef(0);
+  const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
 
   const userPosts = useMemo(() => posts.filter(p => p.user_id === userId), [posts, userId]);
   const totalLikes = useMemo(
@@ -160,6 +161,40 @@ export const UserProfileScreen: React.FC = () => {
     navigation.navigate('Profile' as never);
   };
 
+  const postIndexMap = useMemo(
+    () => new Map(userPosts.map((post, index) => [post.id, index])),
+    [userPosts]
+  );
+
+  const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
+    if (options?.delta != null && options.delta > 0) {
+      const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
+      return;
+    }
+    const index = postIndexMap.get(postId);
+    if (index == null) return;
+    flatListRef.current?.scrollToIndex({
+      index,
+      animated: true,
+      viewPosition: 1,
+      viewOffset: commentScrollOffset,
+    });
+  }, [commentScrollOffset, postIndexMap]);
+
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    const offset = info.averageItemLength * info.index;
+    flatListRef.current?.scrollToOffset({ offset, animated: true });
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 1,
+        viewOffset: commentScrollOffset,
+      });
+    });
+  }, [commentScrollOffset]);
+
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
@@ -216,10 +251,18 @@ export const UserProfileScreen: React.FC = () => {
 
       {!blocked && (
         <FlatList
+          ref={flatListRef}
           data={userPosts}
           keyExtractor={item => item.id}
           refreshing={refreshing}
           onRefresh={refetch}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScroll={(event) => {
+            scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
           renderItem={({ item }) => (
             <PostComponent
               post={{
@@ -246,7 +289,9 @@ export const UserProfileScreen: React.FC = () => {
                 },
               }}
               onLike={() => likePost(item.id)}
-              onComment={(pid) => setCommentPostId(pid)}
+              onCommentAdded={() => adjustCommentCount(item.id, 1)}
+              onCommentFocus={scrollToPost}
+              commentsLayout="compact"
             />
           )}
           ListEmptyComponent={
@@ -258,14 +303,6 @@ export const UserProfileScreen: React.FC = () => {
         />
       )}
 
-      <CommentsSheet
-        visible={!!commentPostId}
-        postId={commentPostId}
-        onClose={() => setCommentPostId(null)}
-        onCommentAdded={() => {
-          if (commentPostId) adjustCommentCount(commentPostId, 1);
-        }}
-      />
     </View>
   );
 };

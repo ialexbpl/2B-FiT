@@ -1,6 +1,6 @@
 // UserPostsSection.tsx - user feed with profile header
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Modal, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
@@ -8,7 +8,6 @@ import { usePosts } from '../../../hooks/usePosts';
 import { useAuth } from '../../../context/AuthContext';
 import { CreatePostModal } from './CreatePostModal';
 import type { PostStats } from './community.types';
-import { CommentsSheet } from './CommentsSheet';
 import { useFriends } from '@hooks/useFriends';
 import { supabase } from '@utils/supabase';
 
@@ -23,7 +22,6 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const { friendCount } = useFriends();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [bioModalVisible, setBioModalVisible] = useState(false);
   const [bioInput, setBioInput] = useState('');
   const [hashtagsInput, setHashtagsInput] = useState('');
@@ -31,6 +29,9 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const [fbInput, setFbInput] = useState('');
   const [bioError, setBioError] = useState<string | null>(null);
   const [isSavingBio, setIsSavingBio] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const scrollOffsetRef = useRef(0);
+  const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
 
   const userPosts = useMemo(() => {
     const filtered = posts.filter(post => post.user_id === session?.user?.id);
@@ -91,9 +92,39 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     following: totalLikes,  // repurposed as total likes
   };
 
-  const handleComment = (postId: string) => {
-    setCommentPostId(postId);
-  };
+  const postIndexMap = useMemo(
+    () => new Map(userPosts.map((post, index) => [post.id, index])),
+    [userPosts]
+  );
+
+  const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
+    if (options?.delta != null && options.delta > 0) {
+      const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
+      return;
+    }
+    const index = postIndexMap.get(postId);
+    if (index == null) return;
+    flatListRef.current?.scrollToIndex({
+      index,
+      animated: true,
+      viewPosition: 1,
+      viewOffset: commentScrollOffset,
+    });
+  }, [commentScrollOffset, postIndexMap]);
+
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    const offset = info.averageItemLength * info.index;
+    flatListRef.current?.scrollToOffset({ offset, animated: true });
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 1,
+        viewOffset: commentScrollOffset,
+      });
+    });
+  }, [commentScrollOffset]);
 
   const handleRefresh = async () => {
     await refetch();
@@ -256,19 +287,29 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   return (
     <View style={[styles.container, { height: availableHeight }]}>
       <FlatList
+        ref={flatListRef}
         data={userPosts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostComponent
             post={convertToLegacyPost(item, displayName)}
             onLike={() => likePost(item.id)}
-            onComment={handleComment}
+            onCommentAdded={() => adjustCommentCount(item.id, 1)}
             onDelete={() => deletePost(item.id)}
+            onCommentFocus={scrollToPost}
+            commentsLayout="compact"
           />
         )}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onScroll={(event) => {
+          scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
         style={{ flex: 1 }}
         ListHeaderComponent={
           <View style={styles.profileHeader}>
@@ -350,17 +391,6 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
       <CreatePostModal
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
-      />
-
-      <CommentsSheet
-        visible={!!commentPostId}
-        postId={commentPostId}
-        onClose={() => setCommentPostId(null)}
-        onCommentAdded={() => {
-          if (commentPostId) {
-            adjustCommentCount(commentPostId, 1);
-          }
-        }}
       />
 
       <Modal

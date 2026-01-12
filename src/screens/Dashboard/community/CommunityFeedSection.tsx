@@ -1,13 +1,12 @@
 // CommunityFeedSection.tsx - WITH PAGER VIEW SUPPORT
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet, Text, Image, Alert } from 'react-native';
+import { View, FlatList, TouchableOpacity, StyleSheet, Text, Alert, Platform } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
 import { usePosts } from '../../../hooks/usePosts';
 import { CreatePostModal } from './CreatePostModal';
 import { useAuth } from '@context/AuthContext';
-import { CommentsSheet } from './CommentsSheet';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '@utils/supabase';
 
@@ -27,8 +26,9 @@ export const CommunityFeedSection: React.FC<Props> = ({
   const [filteredUsername, setFilteredUsername] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const scrollOffsetRef = useRef(0);
+  const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
 
   useEffect(() => {
     if (!createModalVisible) {
@@ -39,6 +39,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
 
   const handleScroll = useCallback((event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
+    scrollOffsetRef.current = offsetY;
     if (offsetY <= 0 && onEnablePagerView) {
       onEnablePagerView();
     }
@@ -70,10 +71,6 @@ export const CommunityFeedSection: React.FC<Props> = ({
     },
   });
 
-  const handleComment = (postId: string) => {
-    setCommentPostId(postId);
-  };
-
   const handleRefresh = async () => {
     await refetch();
     setLastRefresh(new Date());
@@ -91,6 +88,40 @@ export const CommunityFeedSection: React.FC<Props> = ({
     }
     return list;
   }, [posts, filteredUserId, session?.user?.id]);
+
+  const postIndexMap = useMemo(
+    () => new Map(visiblePosts.map((post, index) => [post.id, index])),
+    [visiblePosts]
+  );
+
+  const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
+    if (options?.delta != null && options.delta > 0) {
+      const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
+      return;
+    }
+    const index = postIndexMap.get(postId);
+    if (index == null) return;
+    flatListRef.current?.scrollToIndex({
+      index,
+      animated: true,
+      viewPosition: 1,
+      viewOffset: commentScrollOffset,
+    });
+  }, [commentScrollOffset, postIndexMap]);
+
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    const offset = info.averageItemLength * info.index;
+    flatListRef.current?.scrollToOffset({ offset, animated: true });
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 1,
+        viewOffset: commentScrollOffset,
+      });
+    });
+  }, [commentScrollOffset]);
 
   const getTimeSinceLastRefresh = () => {
     const now = new Date();
@@ -198,7 +229,9 @@ export const CommunityFeedSection: React.FC<Props> = ({
           <PostComponent
             post={convertToLegacyPost(item)}
             onLike={() => likePost(item.id)}
-            onComment={handleComment}
+            onCommentAdded={() => adjustCommentCount(item.id, 1)}
+            onCommentFocus={scrollToPost}
+            commentsLayout="compact"
             onUserPress={async (userId, username) => {
               if (userId !== session?.user?.id) {
                 try {
@@ -224,6 +257,9 @@ export const CommunityFeedSection: React.FC<Props> = ({
         onRefresh={handleRefresh}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListHeaderComponent={
           <View style={styles.refreshHeader}>
             <Text style={styles.refreshText}>
@@ -276,17 +312,6 @@ export const CommunityFeedSection: React.FC<Props> = ({
       <CreatePostModal
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
-      />
-
-      <CommentsSheet
-        visible={!!commentPostId}
-        postId={commentPostId}
-        onClose={() => setCommentPostId(null)}
-        onCommentAdded={() => {
-          if (commentPostId) {
-            adjustCommentCount(commentPostId, 1);
-          }
-        }}
       />
     </View>
   );

@@ -1,11 +1,13 @@
 // CommentsSheet.tsx - modal for viewing and adding comments
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -35,6 +37,7 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
   const { session } = useAuth();
   const { comments, loading, submitting, refresh, addComment } = useComments(postId);
   const [text, setText] = useState('');
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (visible) {
@@ -50,6 +53,9 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
         overlay: {
           flex: 1,
           backgroundColor: 'rgba(0,0,0,0.35)',
+        },
+        keyboardWrapper: {
+          flex: 1,
           justifyContent: 'flex-end',
         },
         container: {
@@ -114,9 +120,15 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
     [palette]
   );
 
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
+  }, []);
+
   const handleSend = async () => {
     if (!text.trim()) return;
     try {
+      dismissKeyboard();
       await addComment(text);
       setText('');
       onCommentAdded?.();
@@ -141,14 +153,21 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
       transparent
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
-        <View style={styles.container}>
+      <Pressable style={styles.overlay} onPress={dismissKeyboard} onPressIn={dismissKeyboard}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardWrapper}
+        >
+          <Pressable style={styles.container} onPress={dismissKeyboard} onPressIn={dismissKeyboard}>
           <View style={styles.header}>
             <Text style={styles.title}>Comments</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                dismissKeyboard();
+                onClose();
+              }}
+            >
               <Ionicons name="close" size={24} color={palette.text} />
             </TouchableOpacity>
           </View>
@@ -175,6 +194,7 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
 
           <View style={styles.inputRow}>
             <TextInput
+              ref={inputRef}
               style={styles.input}
               placeholder={
                 session ? 'Add a comment...' : 'Sign in to add a comment'
@@ -197,8 +217,9 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
     </Modal>
   );
 };
