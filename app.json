@@ -29,6 +29,11 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e5a6fd31-63e7-40da-8ab6-b71dc634b091"
+      }
+    }
   }
 }
