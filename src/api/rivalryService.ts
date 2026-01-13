@@ -1,166 +1,332 @@
 import { supabase } from '@utils/supabase';
 import { RivalrySummary, Challenge } from '../models/RivalryModel';
 
-export const getRivalrySummary = async (userId: string): Promise<RivalrySummary | null> => {
-    const { data, error } = await supabase
-        .from('rivalry_summaries')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle(); // FIX: maybeSingle prevents error on no rows
-
-    if (error) {
-        console.warn('Error fetching rivalry summary:', error);
-        return null; // Safe fallback
+// Helper to check if rivalry tables exist
+const checkTableExists = async (tableName: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase
+            .from(tableName)
+            .select('*')
+            .limit(1);
+        
+        // PGRST205 means table doesn't exist
+        if (error?.code === 'PGRST205') {
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
     }
-    return data as RivalrySummary;
+};
+
+export const getRivalrySummary = async (userId: string): Promise<RivalrySummary | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('rivalry_summaries')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error) {
+            // Silently handle missing table
+            if (error.code === 'PGRST205') {
+                return null;
+            }
+            console.warn('Error fetching rivalry summary:', error);
+            return null;
+        }
+        return data as RivalrySummary;
+    } catch {
+        return null;
+    }
 };
 
 export const getLeaderboard = async (period: 'weekly' | 'monthly' = 'weekly'): Promise<RivalrySummary[]> => {
-    let rawData = [];
+    try {
+        // Calculate dates
+        const now = new Date();
+        let startDate = new Date();
+        if (period === 'weekly') {
+            startDate.setDate(now.getDate() - 7);
+        } else {
+            startDate.setDate(now.getDate() - 30);
+        }
 
-    // Calculate dates
-    const now = new Date();
-    let startDate = new Date();
-    if (period === 'weekly') {
-        // Last 7 days
-        startDate.setDate(now.getDate() - 7);
-    } else {
-        // Last 30 days
-        startDate.setDate(now.getDate() - 30);
-    }
+        // Call RPC for period-based stats
+        const { data, error } = await supabase
+            .rpc('get_leaderboard_by_date', { start_date: startDate.toISOString() });
 
-    // Call RPC for period-based stats
-    const { data, error } = await supabase
-        .rpc('get_leaderboard_by_date', { start_date: startDate.toISOString() });
+        if (error) {
+            // Silently handle missing RPC function
+            if (error.code === 'PGRST202') {
+                return [];
+            }
+            console.warn('Error fetching leaderboard:', error);
+            return [];
+        }
 
-    if (error) {
-        console.error('Error fetching leaderboard RPC:', error);
+        const rawData = data || [];
+
+        // Fetch profiles manually to join data
+        const userIds = rawData.map((item: any) => item.user_id);
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, username')
+                .in('id', userIds);
+
+            const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+            return rawData.map((item: any) => {
+                const profile = profileMap.get(item.user_id);
+                return {
+                    ...item,
+                    username: profile?.full_name || profile?.username || 'Unknown',
+                    avatar_url: profile?.avatar_url
+                };
+            });
+        }
+
+        return rawData as RivalrySummary[];
+    } catch {
         return [];
     }
-    rawData = data || [];
+};
 
-    // 2. Fetch profiles manually to join data (avoid Foreign Key issues)
-    const userIds = (rawData || []).map((item: any) => item.user_id);
-    if (userIds.length > 0) {
+export const getActiveChallenges = async (userId: string): Promise<Challenge[]> => {
+    try {
+        const { data: challenges, error } = await supabase
+            .from('rivalry_challenges')
+            .select('*')
+            .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
+            .eq('status', 'active');
+
+        if (error) {
+            // Silently handle missing table
+            if (error.code === 'PGRST205') {
+                return [];
+            }
+            console.warn('Error fetching active challenges:', error);
+            return [];
+        }
+
+        if (!challenges || challenges.length === 0) return [];
+
+        // Fetch relevant profiles manually
+        const profileIds = new Set<string>();
+        challenges.forEach((c: any) => {
+            if (c.challenger_id) profileIds.add(c.challenger_id);
+            if (c.opponent_id) profileIds.add(c.opponent_id);
+        });
+
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, full_name, avatar_url, username')
+            .select('id, full_name, avatar_url')
+            .in('id', Array.from(profileIds));
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        return challenges.map((c: any) => ({
+            ...c,
+            challenger: profileMap.get(c.challenger_id),
+            opponent: profileMap.get(c.opponent_id)
+        }));
+    } catch {
+        return [];
+    }
+};
+
+export const getOpenLobbies = async (userId: string): Promise<Challenge[]> => {
+    try {
+        // Get ALL pending challenges from OTHER users that you can join
+        // No time filter - show all open lobbies
+        
+        const { data: challenges, error } = await supabase
+            .from('rivalry_challenges')
+            .select('*')
+            .eq('status', 'pending')
+            .is('opponent_id', null)
+            .neq('challenger_id', userId) // Not my own
+            .order('start_time', { ascending: false }); // Newest first
+
+        console.log('Open lobbies query result:', { challenges, error, userId });
+
+        if (error) {
+            if (error.code === 'PGRST205') return [];
+            console.warn('Error fetching open lobbies:', error);
+            return [];
+        }
+
+        if (!challenges || challenges.length === 0) {
+            console.log('No open lobbies found');
+            return [];
+        }
+        
+        console.log('Found', challenges.length, 'open lobbies');
+
+        // Fetch challenger profiles
+        const profileIds = new Set<string>();
+        challenges.forEach((c: any) => {
+            if (c.challenger_id) profileIds.add(c.challenger_id);
+        });
+
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', Array.from(profileIds));
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        return challenges.map((c: any) => ({
+            ...c,
+            challenger: profileMap.get(c.challenger_id),
+            opponent: null
+        }));
+    } catch {
+        return [];
+    }
+};
+
+export const joinChallenge = async (challengeId: string, visitorId: string): Promise<Challenge | null> => {
+    try {
+        console.log('Attempting to join challenge:', challengeId, 'as user:', visitorId);
+        
+        // First, get the challenge without filters to see its current state
+        const { data: allChallenges, error: debugError } = await supabase
+            .from('rivalry_challenges')
+            .select('*')
+            .eq('id', challengeId);
+            
+        console.log('Challenge current state:', allChallenges?.[0]);
+        
+        if (allChallenges && allChallenges[0]) {
+            const c = allChallenges[0];
+            if (c.status !== 'pending') {
+                throw new Error(`Challenge status is "${c.status}", not "pending"`);
+            }
+            if (c.opponent_id !== null) {
+                throw new Error('Someone already joined this challenge');
+            }
+            if (c.challenger_id === visitorId) {
+                throw new Error('You cannot join your own challenge');
+            }
+        } else {
+            throw new Error('Challenge not found');
+        }
+
+        const challenge = allChallenges[0];
+
+        // Calculate start/end times
+        const startTime = new Date().toISOString();
+        const endTime = new Date(Date.now() + challenge.duration_hours * 3600 * 1000).toISOString();
+
+        // Update the challenge
+        const { data: updatedData, error: joinError } = await supabase
+            .from('rivalry_challenges')
+            .update({
+                opponent_id: visitorId,
+                status: 'active',
+                start_time: startTime,
+                end_time: endTime
+            })
+            .eq('id', challengeId)
+            .select();
+
+        console.log('Join challenge - update result:', { updatedData, joinError });
+
+        if (joinError) {
+            console.warn('Error updating challenge:', joinError);
+            throw new Error('Failed to join: ' + joinError.message);
+        }
+
+        if (!updatedData || updatedData.length === 0) {
+            throw new Error('Failed to update challenge');
+        }
+
+        return await getChallengeById(updatedData[0].id);
+    } catch (e: any) {
+        console.warn('Error joining challenge:', e);
+        throw e;
+    }
+};
+
+export const getChallengeHistory = async (userId: string): Promise<Challenge[]> => {
+    try {
+        const { data: challenges, error } = await supabase
+            .from('rivalry_challenges')
+            .select('*')
+            .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
+            .in('status', ['finished', 'declined'])
+            .order('end_time', { ascending: false });
+
+        if (error) {
+            // Silently handle missing table
+            if (error.code === 'PGRST205') {
+                return [];
+            }
+            console.warn('Error fetching challenge history:', error);
+            return [];
+        }
+
+        if (!challenges || challenges.length === 0) return [];
+
+        // Fetch relevant profiles manually
+        const profileIds = new Set<string>();
+        challenges.forEach((c: any) => {
+            if (c.challenger_id) profileIds.add(c.challenger_id);
+            if (c.opponent_id) profileIds.add(c.opponent_id);
+        });
+
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', Array.from(profileIds));
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        return challenges.map((c: any) => ({
+            ...c,
+            challenger: profileMap.get(c.challenger_id),
+            opponent: profileMap.get(c.opponent_id)
+        }));
+    } catch {
+        return [];
+    }
+};
+
+export const getChallengeById = async (challengeId: string): Promise<Challenge | null> => {
+    try {
+        const { data: challenge, error } = await supabase
+            .from('rivalry_challenges')
+            .select('*')
+            .eq('id', challengeId)
+            .single();
+
+        if (error || !challenge) {
+            if (error?.code === 'PGRST205') {
+                return null;
+            }
+            console.warn('Error fetching challenge details:', error);
+            return null;
+        }
+
+        // Fetch profiles
+        const userIds = [challenge.challenger_id, challenge.opponent_id].filter(Boolean);
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
             .in('id', userIds);
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
-        return rawData.map((item: any) => {
-            const profile = profileMap.get(item.user_id);
-            return {
-                ...item,
-                username: profile?.full_name || profile?.username || 'Unknown',
-                avatar_url: profile?.avatar_url
-            };
-        });
-    }
-
-    return rawData as RivalrySummary[];
-};
-
-export const getActiveChallenges = async (userId: string): Promise<Challenge[]> => {
-    // 1. Fetch active challenges
-    const { data: challenges, error } = await supabase
-        .from('rivalry_challenges')
-        .select('*')
-        .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
-        .eq('status', 'active');
-
-    if (error) {
-        console.error('Error fetching active challenges:', error);
-        return [];
-    }
-
-    if (!challenges || challenges.length === 0) return [];
-
-    // 2. Fetch relevant profiles manually
-    const profileIds = new Set<string>();
-    challenges.forEach((c: any) => {
-        if (c.challenger_id) profileIds.add(c.challenger_id);
-        if (c.opponent_id) profileIds.add(c.opponent_id);
-    });
-
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', Array.from(profileIds));
-
-    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-    return challenges.map((c: any) => ({
-        ...c,
-        challenger: profileMap.get(c.challenger_id),
-        opponent: profileMap.get(c.opponent_id)
-    }));
-};
-
-export const getChallengeHistory = async (userId: string): Promise<Challenge[]> => {
-    // 1. Fetch raw history
-    const { data: challenges, error } = await supabase
-        .from('rivalry_challenges')
-        .select('*')
-        .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
-        .in('status', ['finished', 'declined']) // Filter for history
-        .order('end_time', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching challenge history:', error);
-        return [];
-    }
-
-    if (!challenges || challenges.length === 0) return [];
-
-    // 2. Fetch relevant profiles manually
-    const profileIds = new Set<string>();
-    challenges.forEach((c: any) => {
-        if (c.challenger_id) profileIds.add(c.challenger_id);
-        if (c.opponent_id) profileIds.add(c.opponent_id);
-    });
-
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', Array.from(profileIds));
-
-    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-    return challenges.map((c: any) => ({
-        ...c,
-        challenger: profileMap.get(c.challenger_id),
-        opponent: profileMap.get(c.opponent_id)
-    }));
-};
-
-export const getChallengeById = async (challengeId: string): Promise<Challenge | null> => {
-    const { data: challenge, error } = await supabase
-        .from('rivalry_challenges')
-        .select('*')
-        .eq('id', challengeId)
-        .single();
-
-    if (error || !challenge) {
-        console.error('Error fetching challenge details:', error);
+        return {
+            ...challenge,
+            challenger: profileMap.get(challenge.challenger_id),
+            opponent: profileMap.get(challenge.opponent_id)
+        };
+    } catch {
         return null;
     }
-
-    // Fetch profiles
-    const userIds = [challenge.challenger_id, challenge.opponent_id].filter(Boolean);
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-    return {
-        ...challenge,
-        challenger: profileMap.get(challenge.challenger_id),
-        opponent: profileMap.get(challenge.opponent_id)
-    };
 };
 
 export const findOrCreateQuickMatch = async (
@@ -169,9 +335,15 @@ export const findOrCreateQuickMatch = async (
     target: number = 6000,
     duration: number = 24
 ): Promise<Challenge & { is_new_created?: boolean }> => {
+    // Check if table exists first
+    const tableExists = await checkTableExists('rivalry_challenges');
+    if (!tableExists) {
+        throw new Error('Rivalry feature is not available. Database tables are not set up.');
+    }
+
     // 1. Try to find an open challenge (pending, no opponent, not created by me)
-    // We try to match the same type first
-    // FILTER: Only consider matches created in the last 15 minutes to avoid stale ghost lobbies
+    // Match any pending challenge of the same TYPE (steps/calories/distance)
+    // Don't filter by exact target or duration - just find someone to play with!
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
     const { data: openChallenges, error: searchError } = await supabase
@@ -181,27 +353,17 @@ export const findOrCreateQuickMatch = async (
         .is('opponent_id', null)
         .neq('challenger_id', userId)
         .eq('challenge_type', type)
-        .gt('start_time', fifteenMinutesAgo) // Only recent matches
-        .limit(1);
+        .gt('start_time', fifteenMinutesAgo)
+        .order('start_time', { ascending: true }) // Oldest first (FIFO)
+        .limit(5); // Get a few candidates
 
-    if (searchError) console.error("Error searching match:", searchError);
+    if (searchError) console.warn("Error searching match:", searchError);
+    
+    console.log("Found open challenges:", openChallenges?.length || 0);
 
-    // DUPLICATE CHECK: Filter out matches where I already have an active duel with this specific opponent
-    // We do this client-side for simplicity as we fetched one candidate
+    // DUPLICATE CHECK
     if (openChallenges && openChallenges.length > 0) {
         const candidate = openChallenges[0];
-
-        // Check if I have an active match with candidate.challenger_id
-        const { data: existingDuel } = await supabase
-            .from('rivalry_challenges')
-            .select('id')
-            .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
-            .or(`challenger_id.eq.${candidate.challenger_id},opponent_id.eq.${candidate.challenger_id}`)
-            .eq('status', 'active')
-            .limit(1);
-
-        // If existing match found where both are participants, DO NOT JOIN.
-        // Wait, the .or logic above is too broad. We need AND logic: (me IN match) AND (him IN match) AND active.
 
         const { data: myMatchesWithHim } = await supabase
             .from('rivalry_challenges')
@@ -212,10 +374,7 @@ export const findOrCreateQuickMatch = async (
 
         if (myMatchesWithHim && myMatchesWithHim.length > 0) {
             console.log("Skipping candidate - already have active match with user:", candidate.challenger_id);
-            // Cannot join this one.
-            // In a recursive solution we would search again excluding this ID. 
-            // For MVP, if we find a duplicate, we just fall through to "Create Waiting Room" (Wait for someone else).
-            openChallenges.pop(); // Remove it so we don't enter the join block
+            openChallenges.pop();
         }
     }
 
@@ -223,8 +382,7 @@ export const findOrCreateQuickMatch = async (
         const match = openChallenges[0];
         console.log("Found match, joining:", match.id);
 
-        // --- SCHEDULING LOGIC ---
-        // 1. Get my latest active end_time
+        // SCHEDULING LOGIC
         const { data: myActive } = await supabase
             .from('rivalry_challenges')
             .select('end_time')
@@ -233,7 +391,6 @@ export const findOrCreateQuickMatch = async (
             .order('end_time', { ascending: false })
             .limit(1);
 
-        // 2. Get opponent's latest active end_time
         const opponentId = match.challenger_id;
         const { data: theirActive } = await supabase
             .from('rivalry_challenges')
@@ -247,9 +404,8 @@ export const findOrCreateQuickMatch = async (
         const theirLatest = theirActive?.[0]?.end_time ? new Date(theirActive[0].end_time).getTime() : 0;
         const nowTime = Date.now();
 
-        // Start time is MAX(now, myLatest, theirLatest) + buffer
         const pendingMax = Math.max(nowTime, myLatest, theirLatest);
-        const startTime = new Date(pendingMax + 2000).toISOString(); // +2 sec buffer
+        const startTime = new Date(pendingMax + 2000).toISOString();
         const endTime = new Date(new Date(startTime).getTime() + match.duration_hours * 3600 * 1000).toISOString();
 
         console.log(`Scheduling match. Start: ${startTime}`);
@@ -268,7 +424,6 @@ export const findOrCreateQuickMatch = async (
 
         if (joinError) throw joinError;
 
-        // Return full structure with profiles
         return await getChallengeById(joinedMatch.id) as Challenge;
     }
 
@@ -279,13 +434,12 @@ export const findOrCreateQuickMatch = async (
         .from('rivalry_challenges')
         .insert({
             challenger_id: userId,
-            opponent_id: null, // explicit null
+            opponent_id: null,
             challenge_type: type,
             target_value: target,
             duration_hours: duration,
             status: 'pending',
-            start_time: new Date().toISOString(), // creation time
-            // end_time is null until started
+            start_time: new Date().toISOString(),
             challenger_progress: 0,
             opponent_progress: 0
         })
@@ -294,7 +448,6 @@ export const findOrCreateQuickMatch = async (
 
     if (createError) throw createError;
 
-    // Return with just challenger profile loaded
     return await getChallengeById(newMatch.id) as Challenge;
 };
 
@@ -316,7 +469,7 @@ export const createChallenge = async (
             challenge_type: type,
             target_value: target,
             duration_hours: duration,
-            status: 'active', // Direct active for MV P
+            status: 'active',
             start_time: startTime,
             end_time: endTime,
             challenger_progress: 0,
@@ -329,8 +482,7 @@ export const createChallenge = async (
     return data;
 };
 
-export const surrenderChallenge = async (challengeId: string, userId: string) => {
-    // 1. Get the challenge to identify the opponent
+export const surrenderChallenge = async (challengeId: string, visitorId: string) => {
     const { data: challenge, error: fetchError } = await supabase
         .from('rivalry_challenges')
         .select('challenger_id, opponent_id')
@@ -339,18 +491,16 @@ export const surrenderChallenge = async (challengeId: string, userId: string) =>
 
     if (fetchError || !challenge) throw new Error('Challenge not found');
 
-    // 2. Determine winner (the other person)
-    const winnerId = challenge.challenger_id === userId ? challenge.opponent_id : challenge.challenger_id;
+    const winnerId = challenge.challenger_id === visitorId ? challenge.opponent_id : challenge.challenger_id;
 
     if (!winnerId) throw new Error('Opponent not found');
 
-    // 3. Update challenge status and winner
     const { data, error } = await supabase
         .from('rivalry_challenges')
         .update({
             status: 'finished',
             winner_id: winnerId,
-            end_time: new Date().toISOString() // End immediately
+            end_time: new Date().toISOString()
         })
         .eq('id', challengeId)
         .select()
@@ -360,30 +510,32 @@ export const surrenderChallenge = async (challengeId: string, userId: string) =>
     return data;
 };
 
-export const updateChallengeProgress = async (challengeId: string, userId: string, progress: number) => {
-    // Determine which column to update based on user ID
-    // We first need to know if user is challenger or opponent
-    const { data: challenge, error: fetchError } = await supabase
-        .from('rivalry_challenges')
-        .select('challenger_id, opponent_id')
-        .eq('id', challengeId)
-        .single();
+export const updateChallengeProgress = async (challengeId: string, visitorId: string, progress: number) => {
+    try {
+        const { data: challenge, error: fetchError } = await supabase
+            .from('rivalry_challenges')
+            .select('challenger_id, opponent_id')
+            .eq('id', challengeId)
+            .single();
 
-    if (fetchError || !challenge) return;
+        if (fetchError || !challenge) return;
 
-    let updateData = {};
-    if (userId === challenge.challenger_id) {
-        updateData = { challenger_progress: progress };
-    } else if (userId === challenge.opponent_id) {
-        updateData = { opponent_progress: progress };
-    } else {
-        return; // User not in this challenge
+        let updateData = {};
+        if (visitorId === challenge.challenger_id) {
+            updateData = { challenger_progress: progress };
+        } else if (visitorId === challenge.opponent_id) {
+            updateData = { opponent_progress: progress };
+        } else {
+            return;
+        }
+
+        const { error } = await supabase
+            .from('rivalry_challenges')
+            .update(updateData)
+            .eq('id', challengeId);
+
+        if (error) console.warn('Error updating progress:', error);
+    } catch {
+        // Silently fail
     }
-
-    const { error } = await supabase
-        .from('rivalry_challenges')
-        .update(updateData)
-        .eq('id', challengeId);
-
-    if (error) console.error('Error updating progress:', error);
 };

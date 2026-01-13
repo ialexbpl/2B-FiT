@@ -6,7 +6,9 @@ import {
   Pressable, 
   ActivityIndicator, 
   Alert,
-  ImageBackground 
+  ImageBackground,
+  Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { makeloginStyles } from './loginStyles';
 import { useTheme } from '@context/ThemeContext';
@@ -88,129 +90,131 @@ export const Login: React.FC = () => {
     };
 
     return (
-        <View style={styles.screen}>
-            <ImageBackground
-                source={require('../../assets/logscreen.png')}
-                style={styles.backgroundImage}
-                resizeMode="cover"
-            >
-                <View style={styles.overlay}>
-                    <View style={styles.container}>
-                        <View style={styles.loginCard}>
-                            <Text style={styles.title}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
-                            <Text style={styles.subtitle}>Welcome back to the app</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.screen}>
+                <ImageBackground
+                    source={require('../../assets/logscreen.png')}
+                    style={styles.backgroundImage}
+                    resizeMode="cover"
+                >
+                    <View style={styles.overlay}>
+                        <View style={styles.container}>
+                            <View style={styles.loginCard}>
+                                <Text style={styles.title}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
+                                <Text style={styles.subtitle}>Welcome back to the app</Text>
 
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    placeholder="Email Address or Username"
-                                    autoCapitalize="none"
-                                    keyboardType="email-address"
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    style={styles.input}
-                                    placeholderTextColor={palette.subText}
-                                />
-                            </View>
-
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    placeholder="Password"
-                                    secureTextEntry={!showPassword}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    style={styles.input}
-                                    placeholderTextColor={palette.subText}
-                                />
-                                <Pressable onPress={() => setShowPassword(v => !v)} style={styles.inputIconBtn} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
-                                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.subText} />
-                                </Pressable>
-                            </View>
-
-                            {/* Sign up-only field */}
-                            {mode === 'signup' && (
                                 <View style={styles.inputWrapper}>
                                     <TextInput
-                                        placeholder="Username"
-                                        value={username}
-                                        onChangeText={setUsername}
+                                        placeholder="Email Address or Username"
+                                        autoCapitalize="none"
+                                        keyboardType="email-address"
+                                        value={email}
+                                        onChangeText={setEmail}
                                         style={styles.input}
                                         placeholderTextColor={palette.subText}
                                     />
                                 </View>
-                            )}
 
-                            <View style={styles.rowBetween}>
-                                <Pressable onPress={() => setKeepSignedIn(v => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: keepSignedIn }}>
-                                    <View style={styles.checkbox}>{keepSignedIn && <View style={styles.checkMark} />}</View>
-                                    <Text style={{ color: palette.text }}>Keep me signed in</Text>
-                                </Pressable>
-                                {mode === 'login' && (
-                                    <Pressable onPress={onForgotPassword} disabled={busy} accessibilityRole="button" accessibilityLabel="Forgot password">
-                                        <Text style={styles.linkText}>Forgot Password?</Text>
+                                <View style={styles.inputWrapper}>
+                                    <TextInput
+                                        placeholder="Password"
+                                        secureTextEntry={!showPassword}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        style={styles.input}
+                                        placeholderTextColor={palette.subText}
+                                    />
+                                    <Pressable onPress={() => setShowPassword(v => !v)} style={styles.inputIconBtn} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
+                                        <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={palette.subText} />
                                     </Pressable>
-                                )}
-                            </View>
-
-                            <Pressable
-                                disabled={busy}
-                                onPress={mode === 'login' ? onSignIn : onSignUp}
-                                style={({ pressed }) => [
-                                    styles.primaryBtn,
-                                    { opacity: pressed || busy ? 0.85 : 1 },
-                                ]}
-                            >
-                                {busy ? (
-                                    <ActivityIndicator color={palette.onPrimary} />
-                                ) : (
-                                    <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
-                                )}
-                            </Pressable>
-
-                            <View style={styles.dividerRow}>
-                                <View style={styles.divider} />
-                                <Text style={styles.dividerText}>or continue with</Text>
-                                <View style={styles.divider} />
-                            </View>
-
-                            {/* Google Sign In Button */}
-                            <Pressable
-                                onPress={onGoogleSignIn}
-                                disabled={busy}
-                                style={({ pressed }) => [
-                                    styles.googleBtn,
-                                    {
-                                        opacity: pressed || busy ? 0.9 : 1,
-                                    }
-                                ]}
-                            >
-                                <View style={styles.googleIconWrap}>
-                                    <Ionicons name="logo-google" size={20} color="#DB4437" />
                                 </View>
-                                <Text style={styles.googleBtnText}>Continue with Google</Text>
-                            </Pressable>
 
-                            <View style={styles.footerRow}>
-                                {mode === 'login' ? (
-                                    <>
-                                        <Text style={{ color: palette.subText }}>Don't have an account?</Text>
-                                        <Pressable onPress={() => setMode('signup')} accessibilityRole="button" accessibilityLabel="Create account">
-                                            <Text style={styles.footerLink}>Create an account</Text>
-                                        </Pressable>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text style={{ color: palette.subText }}>Already have an account?</Text>
-                                        <Pressable onPress={() => setMode('login')} accessibilityRole="button" accessibilityLabel="Back to login">
-                                            <Text style={styles.footerLink}>Login</Text>
-                                        </Pressable>
-                                    </>
+                                {/* Sign up-only field */}
+                                {mode === 'signup' && (
+                                    <View style={styles.inputWrapper}>
+                                        <TextInput
+                                            placeholder="Username"
+                                            value={username}
+                                            onChangeText={setUsername}
+                                            style={styles.input}
+                                            placeholderTextColor={palette.subText}
+                                        />
+                                    </View>
                                 )}
+
+                                <View style={styles.rowBetween}>
+                                    <Pressable onPress={() => setKeepSignedIn(v => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: keepSignedIn }}>
+                                        <View style={styles.checkbox}>{keepSignedIn && <View style={styles.checkMark} />}</View>
+                                        <Text style={{ color: palette.text }}>Keep me signed in</Text>
+                                    </Pressable>
+                                    {mode === 'login' && (
+                                        <Pressable onPress={onForgotPassword} disabled={busy} accessibilityRole="button" accessibilityLabel="Forgot password">
+                                            <Text style={styles.linkText}>Forgot Password?</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+
+                                <Pressable
+                                    disabled={busy}
+                                    onPress={mode === 'login' ? onSignIn : onSignUp}
+                                    style={({ pressed }) => [
+                                        styles.primaryBtn,
+                                        { opacity: pressed || busy ? 0.85 : 1 },
+                                    ]}
+                                >
+                                    {busy ? (
+                                        <ActivityIndicator color={palette.onPrimary} />
+                                    ) : (
+                                        <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
+                                    )}
+                                </Pressable>
+
+                                <View style={styles.dividerRow}>
+                                    <View style={styles.divider} />
+                                    <Text style={styles.dividerText}>or continue with</Text>
+                                    <View style={styles.divider} />
+                                </View>
+
+                                {/* Google Sign In Button */}
+                                <Pressable
+                                    onPress={onGoogleSignIn}
+                                    disabled={busy}
+                                    style={({ pressed }) => [
+                                        styles.googleBtn,
+                                        {
+                                            opacity: pressed || busy ? 0.9 : 1,
+                                        }
+                                    ]}
+                                >
+                                    <View style={styles.googleIconWrap}>
+                                        <Ionicons name="logo-google" size={20} color="#DB4437" />
+                                    </View>
+                                    <Text style={styles.googleBtnText}>Continue with Google</Text>
+                                </Pressable>
+
+                                <View style={styles.footerRow}>
+                                    {mode === 'login' ? (
+                                        <>
+                                            <Text style={{ color: palette.subText }}>Don't have an account?</Text>
+                                            <Pressable onPress={() => setMode('signup')} accessibilityRole="button" accessibilityLabel="Create account">
+                                                <Text style={styles.footerLink}>Create an account</Text>
+                                            </Pressable>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={{ color: palette.subText }}>Already have an account?</Text>
+                                            <Pressable onPress={() => setMode('login')} accessibilityRole="button" accessibilityLabel="Back to login">
+                                                <Text style={styles.footerLink}>Login</Text>
+                                            </Pressable>
+                                        </>
+                                    )}
+                                </View>
                             </View>
                         </View>
                     </View>
-                </View>
-            </ImageBackground>
-        </View>
+                </ImageBackground>
+            </View>
+        </TouchableWithoutFeedback>
     );
 };
 

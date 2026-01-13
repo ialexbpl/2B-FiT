@@ -8,6 +8,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import Login from '@screens/Login/Login';
+import { useRivalryNotifications } from './src/hooks/useRivalryNotifications';
 
 import * as Notifications from 'expo-notifications';
 
@@ -20,6 +21,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Component to initialize rivalry notifications when logged in
+function RivalryNotificationHandler() {
+  useRivalryNotifications();
+  return null;
+}
+
 function AppShell() {
   const { isDark, palette } = useTheme();
   const { isLoggedIn, isLoading } = useAuth();
@@ -30,7 +37,14 @@ function AppShell() {
       <ProfileProvider>
         <NavigationContainer>
           {/* Simple gate: you can swap to a Stack later if desired */}
-          {isLoading ? null : isLoggedIn ? <RootTabs /> : <Login />}
+          {isLoading ? null : isLoggedIn ? (
+            <>
+              <RivalryNotificationHandler />
+              <RootTabs />
+            </>
+          ) : (
+            <Login />
+          )}
         </NavigationContainer>
       </ProfileProvider>
     </SafeAreaView>
