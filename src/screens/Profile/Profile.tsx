@@ -1,16 +1,25 @@
 import React from "react";
 import {
+  Animated,
   FlatList,
+  ScrollView,
   View,
   Text,
   Image,
   TouchableOpacity,
+  Pressable,
   ImageSourcePropType,
+  PanResponder,
+  LayoutAnimation,
+  Platform,
   Alert,
   ActivityIndicator,
   Modal,
+  Keyboard,
   TextInput,
   Linking,
+  UIManager,
+  useWindowDimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from 'expo-image-picker';
@@ -25,7 +34,6 @@ import { supabase } from "@utils/supabase";
 import { usePosts } from "@hooks/usePosts";
 import { CreatePostModal } from "@screens/Dashboard/community/CreatePostModal";
 import { PostComponent } from "@screens/Dashboard/community/PostComponent";
-import { CommentsSheet } from "@screens/Dashboard/community/CommentsSheet";
 import type { Post as LegacyPost } from "@screens/Dashboard/community/community.types";
 import { useFriends } from "@hooks/useFriends";
 import { FriendsPanel } from "./FriendsPanel";
@@ -83,11 +91,42 @@ export const Profile: React.FC = () => {
   } = useFriends();
   const [createModalVisible, setCreateModalVisible] = React.useState(false);
   const [detailPost, setDetailPost] = React.useState<LegacyPost | null>(null);
-  const [commentPostId, setCommentPostId] = React.useState<string | null>(null);
+  const detailTranslateY = React.useRef(new Animated.Value(0)).current;
+  const didMountRef = React.useRef(false);
+  const detailCardLayoutRef = React.useRef<{ y: number; height: number } | null>(null);
+  const detailScrollRef = React.useRef<ScrollView>(null);
+  const detailScrollYRef = React.useRef(0);
+  const nameInputRef = React.useRef<TextInput>(null);
+  const bioInputRef = React.useRef<TextInput>(null);
+  const hashtagsInputRef = React.useRef<TextInput>(null);
+  const igInputRef = React.useRef<TextInput>(null);
+  const fbInputRef = React.useRef<TextInput>(null);
+  const [detailPostOpenComments, setDetailPostOpenComments] = React.useState(false);
   const [friendsVisible, setFriendsVisible] = React.useState(false);
   const [notificationsVisible, setNotificationsVisible] = React.useState(false);
   const [refreshingUI, setRefreshingUI] = React.useState(false);
+  const { height: windowHeight } = useWindowDimensions();
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
+  const tabBarStyle = React.useMemo(
+    () => ({
+      backgroundColor: palette.card,
+      borderTopColor: palette.border,
+      height: Platform.OS === 'ios' ? 80 : 64,
+      paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+      paddingTop: 8,
+    }),
+    [palette.card, palette.border]
+  );
+  const tabBarHiddenStyle = React.useMemo(
+    () => ({
+      height: 0,
+      paddingBottom: 0,
+      paddingTop: 0,
+      borderTopWidth: 0,
+      opacity: 0,
+    }),
+    []
+  );
 
   const displayName = React.useMemo(() => {
     const trimmedFullName = profile?.full_name?.trim();
@@ -254,6 +293,12 @@ export const Profile: React.FC = () => {
     setFbInput(fbText);
   }, [bioText, hashtagsText, igText, fbText]);
 
+  React.useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   // Refresh posts when privacy mode changes to reflect visibility
   React.useEffect(() => {
     refetchPosts();
@@ -347,6 +392,105 @@ export const Profile: React.FC = () => {
     });
   }, []);
 
+  const dismissBioKeyboard = React.useCallback(() => {
+    Keyboard.dismiss();
+    nameInputRef.current?.blur();
+    bioInputRef.current?.blur();
+    hashtagsInputRef.current?.blur();
+    igInputRef.current?.blur();
+    fbInputRef.current?.blur();
+  }, []);
+
+  const isGestureStartInCard = React.useCallback((startY: number) => {
+    const layout = detailCardLayoutRef.current;
+    if (!layout) return true;
+    return startY >= layout.y && startY <= layout.y + layout.height;
+  }, []);
+
+  const closeDetailPost = React.useCallback((animated = true) => {
+    if (!animated) {
+      detailTranslateY.setValue(0);
+      setDetailPost(null);
+      setDetailPostOpenComments(false);
+      return;
+    }
+    Animated.timing(detailTranslateY, {
+      toValue: windowHeight,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      detailTranslateY.setValue(0);
+      setDetailPost(null);
+      setDetailPostOpenComments(false);
+    });
+  }, [detailTranslateY, windowHeight]);
+
+  React.useEffect(() => {
+    if (detailPost) {
+      detailTranslateY.setValue(0);
+      detailScrollYRef.current = 0;
+      detailScrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [detailPost, detailTranslateY]);
+
+  React.useEffect(() => {
+    const nextStyle = detailPost ? tabBarHiddenStyle : tabBarStyle;
+    if (didMountRef.current) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    } else {
+      didMountRef.current = true;
+    }
+    navigation.setOptions({ tabBarStyle: nextStyle });
+  }, [detailPost, navigation, tabBarHiddenStyle, tabBarStyle]);
+
+  const detailPanResponder = React.useMemo(
+    () => PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, gesture) =>
+        gesture.dy > 4 &&
+        Math.abs(gesture.dy) > Math.abs(gesture.dx) &&
+        detailScrollYRef.current <= 0 &&
+        isGestureStartInCard(gesture.y0),
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+        gesture.dy > 4 &&
+        Math.abs(gesture.dy) > Math.abs(gesture.dx) &&
+        detailScrollYRef.current <= 0 &&
+        isGestureStartInCard(gesture.y0),
+      onPanResponderMove: (_evt, gesture) => {
+        detailTranslateY.setValue(Math.max(gesture.dy, 0));
+      },
+      onPanResponderRelease: (_evt, gesture) => {
+        const shouldClose = gesture.dy > 120 || gesture.vy > 1.2;
+        if (shouldClose) {
+          closeDetailPost(true);
+          return;
+        }
+        Animated.spring(detailTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 0,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(detailTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 0,
+        }).start();
+      },
+    }),
+    [closeDetailPost, detailTranslateY, isGestureStartInCard]
+  );
+
+  const detailBackdropOpacity = React.useMemo(
+    () =>
+      detailTranslateY.interpolate({
+        inputRange: [0, windowHeight * 0.6],
+        outputRange: [1, 0.2],
+        extrapolate: 'clamp',
+      }),
+    [detailTranslateY, windowHeight]
+  );
+
   const headerContent = (
     <View style={styles.sectionCombined}>
       <View style={styles.headerRow}>
@@ -403,7 +547,12 @@ export const Profile: React.FC = () => {
           <Text style={styles.statNumber}>{totalLikes}</Text>
           <Text style={styles.statLabel}>Likes</Text>
         </View>
-        <TouchableOpacity style={styles.statItem} onPress={() => setCommentPostId(userPosts[0]?.id || null)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.statItem} onPress={() => {
+          if (userPosts[0]) {
+            setDetailPost(convertToLegacyPost(userPosts[0]));
+            setDetailPostOpenComments(true);
+          }
+        }} activeOpacity={0.85}>
           <Text style={styles.statNumber}>{totalComments}</Text>
           <Text style={styles.statLabel}>Comments</Text>
         </TouchableOpacity>
@@ -490,7 +639,10 @@ export const Profile: React.FC = () => {
             >
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setDetailPost(convertToLegacyPost(post))}
+                onPress={() => {
+                  setDetailPost(convertToLegacyPost(post));
+                  setDetailPostOpenComments(false);
+                }}
               >
                 {post.image_url ? (
                   <Image source={{ uri: post.image_url }} style={styles.postTileImage} />
@@ -506,7 +658,10 @@ export const Profile: React.FC = () => {
               <TouchableOpacity
                 style={styles.commentBar}
                 activeOpacity={0.85}
-                onPress={() => setCommentPostId(post.id)}
+                onPress={() => {
+                  setDetailPost(convertToLegacyPost(post));
+                  setDetailPostOpenComments(true);
+                }}
               >
                 <Icon name="chatbubble-ellipses-outline" size={14} color={palette.subText} />
                 <Text style={styles.commentBarText}>{post.comments_count || 0} comments</Text>
@@ -554,56 +709,86 @@ export const Profile: React.FC = () => {
 
       <Modal
         visible={!!detailPost}
-        animationType="slide"
+        animationType="fade"
         transparent
-        onRequestClose={() => setDetailPost(null)}
+        onRequestClose={() => closeDetailPost(false)}
       >
-        <View style={styles.postModalOverlay}>
-          <View style={[styles.postModalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+        <View style={styles.postModalOverlay} {...detailPanResponder.panHandlers}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.postModalBackdrop,
+              { opacity: detailBackdropOpacity },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.postModalCard,
+              { backgroundColor: palette.card100, borderColor: palette.border },
+              { height: Math.round(windowHeight * 0.9) },
+              { transform: [{ translateY: detailTranslateY }] },
+            ]}
+            onLayout={(event) => {
+              const { y, height } = event.nativeEvent.layout;
+              detailCardLayoutRef.current = { y, height };
+            }}
+          >
             <View style={styles.postModalHeader}>
               <Text style={[styles.modalTitle, { color: palette.text }]}>Post details</Text>
-              <TouchableOpacity onPress={() => setDetailPost(null)}>
+              <TouchableOpacity
+                onPress={() => closeDetailPost(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{ padding: 4 }}
+              >
                 <Icon name="close" size={22} color={palette.text} />
               </TouchableOpacity>
             </View>
-            {detailPost ? (
-              <PostComponent
-                post={detailPost}
-                onLike={() => {
-                  likePost(detailPost.id);
-                  setDetailPost(current =>
-                    current ? { ...current, isLiked: !current.isLiked, likes: current.isLiked ? current.likes - 1 : current.likes + 1 } : current
-                  );
-                }}
-                onComment={(postId) => {
-                  setDetailPost(null); // close detail so comments sheet can slide in reliably
-                  setTimeout(() => setCommentPostId(postId), 10);
-                }}
-                onDelete={async (postId) => {
-                  try {
-                    await deletePost(postId);
-                    setDetailPost(null);
-                    refetchPosts();
-                  } catch (err: any) {
-                    Alert.alert('Delete failed', err?.message ?? 'Could not delete post right now.');
-                  }
-                }}
-              />
-            ) : null}
-          </View>
+            <ScrollView
+              ref={detailScrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 12 }}
+              onScroll={(event) => {
+                detailScrollYRef.current = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+            >
+              {detailPost ? (
+                <PostComponent
+                  post={detailPost}
+                  onLike={() => {
+                    likePost(detailPost.id);
+                    setDetailPost(current =>
+                      current ? { ...current, isLiked: !current.isLiked, likes: current.isLiked ? current.likes - 1 : current.likes + 1 } : current
+                    );
+                  }}
+                  forceCommentsOpen={detailPostOpenComments}
+                  commentsLayout="expanded"
+                  allowCommentInput={false}
+                  onCommentAdded={(postId) => {
+                    adjustCommentCount(postId, 1);
+                    setDetailPost(current =>
+                      current ? { ...current, commentsCount: (current.commentsCount || 0) + 1 } : current
+                    );
+                  }}
+                  onDelete={async (postId) => {
+                    try {
+                      await deletePost(postId);
+                      closeDetailPost(false);
+                      refetchPosts();
+                    } catch (err: any) {
+                      Alert.alert('Delete failed', err?.message ?? 'Could not delete post right now.');
+                    }
+                  }}
+                />
+              ) : null}
+            </ScrollView>
+          </Animated.View>
         </View>
       </Modal>
-
-      <CommentsSheet
-        visible={!!commentPostId}
-        postId={commentPostId}
-        onClose={() => setCommentPostId(null)}
-        onCommentAdded={() => {
-          if (commentPostId) {
-            adjustCommentCount(commentPostId, 1);
-          }
-        }}
-      />
 
       <Modal
         transparent
@@ -667,11 +852,20 @@ export const Profile: React.FC = () => {
         visible={nameModalVisible}
         onRequestClose={closeNameModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={dismissBioKeyboard}
+          onPressIn={dismissBioKeyboard}
+        >
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}
+            onPress={dismissBioKeyboard}
+            onPressIn={dismissBioKeyboard}
+          >
             <Text style={[styles.modalTitle, { color: palette.text }]}>Change name</Text>
             <Text style={styles.modalSubtitle}>Update the name shown on your profile.</Text>
             <TextInput
+              ref={nameInputRef}
               value={nameInput}
               onChangeText={setNameInput}
               placeholder="Enter your name"
@@ -700,8 +894,8 @@ export const Profile: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal
@@ -710,11 +904,20 @@ export const Profile: React.FC = () => {
         visible={bioModalVisible}
         onRequestClose={() => setBioModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={dismissBioKeyboard}
+          onPressIn={dismissBioKeyboard}
+        >
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: palette.card100, borderColor: palette.border }]}
+            onPress={dismissBioKeyboard}
+            onPressIn={dismissBioKeyboard}
+          >
             <Text style={[styles.modalTitle, { color: palette.text }]}>Edytuj bio</Text>
             <Text style={styles.modalSubtitle}>Dodaj opis, hashtagi i linki.</Text>
             <TextInput
+              ref={bioInputRef}
               value={bioInput}
               onChangeText={setBioInput}
               placeholder="Bio"
@@ -723,6 +926,7 @@ export const Profile: React.FC = () => {
               multiline
             />
             <TextInput
+              ref={hashtagsInputRef}
               value={hashtagsInput}
               onChangeText={setHashtagsInput}
               placeholder="Hashtagi (np. #fitness #dieta)"
@@ -730,6 +934,7 @@ export const Profile: React.FC = () => {
               style={styles.modalInput}
             />
             <TextInput
+              ref={igInputRef}
               value={igInput}
               onChangeText={setIgInput}
               placeholder="Instagram (link lub @username)"
@@ -738,6 +943,7 @@ export const Profile: React.FC = () => {
               autoCapitalize="none"
             />
             <TextInput
+              ref={fbInputRef}
               value={fbInput}
               onChangeText={setFbInput}
               placeholder="Facebook (link)"
@@ -766,8 +972,8 @@ export const Profile: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
     </View>

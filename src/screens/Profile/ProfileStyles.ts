@@ -926,9 +926,13 @@ export const makeProfileStyles = (palette: Palette) =>
     },
     postModalOverlay: {
       flex: 1,
-      backgroundColor: palette.overlay,
+      backgroundColor: 'transparent',
       justifyContent: 'center',
       paddingHorizontal: 12,
+    },
+    postModalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: palette.overlay,
     },
     postModalCard: {
       borderRadius: theme.radius.xl,

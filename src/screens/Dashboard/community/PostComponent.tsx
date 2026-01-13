@@ -1,21 +1,501 @@
 // community/PostComponent.tsx
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  findNodeHandle,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useTheme } from '@context/ThemeContext';
+import { useAuth } from '@context/AuthContext';
+import { useComments, type Comment as PostComment } from '@hooks/useComments';
 import { Ionicons } from '@expo/vector-icons';
 import type { Post } from './community.types';
 
 type PostComponentProps = {
   post: Post;
   onLike: (postId: string) => void;
-  onComment: (postId: string) => void;
+  onComment?: (postId: string) => void;
   onDelete?: (postId: string) => void;
   onUserPress?: (userId: string, username?: string | null) => void;
+  onCommentAdded?: (postId: string) => void;
+  forceCommentsOpen?: boolean;
+  onCommentFocus?: (postId: string, options?: { delta?: number }) => void;
+  commentsLayout?: 'compact' | 'expanded';
+  allowCommentInput?: boolean;
 };
 
-export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onComment, onDelete, onUserPress }) => {
+const InlineComments: React.FC<{
+  postId: string;
+  onCommentAdded?: (postId: string) => void;
+  onCommentFocus?: (postId: string, options?: { delta?: number }) => void;
+  inputRef: React.RefObject<TextInput>;
+  inputFocusedRef: React.MutableRefObject<boolean>;
+  updateInputBounds: () => void;
+  layout: 'compact' | 'expanded';
+  allowInput: boolean;
+}> = ({ postId, onCommentAdded, onCommentFocus, inputRef, inputFocusedRef, updateInputBounds, layout, allowInput }) => {
+  const { palette } = useTheme();
+  const { session } = useAuth();
+  const { comments, loading, submitting, addComment } = useComments(postId);
+  const [text, setText] = useState('');
+  const [inputFocused, setInputFocused] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const listRef = useRef<FlatList<PostComment>>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const keyboardHeightRef = useRef(0);
+
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
+  }, []);
+
+  const requestScrollForInput = useCallback(() => {
+    if (!allowInput) return;
+    if (!onCommentFocus || !inputRef.current) return;
+    const keyboardHeight = keyboardHeightRef.current;
+    if (!keyboardHeight) return;
+    inputRef.current.measureInWindow((_x, y, _width, height) => {
+      const inputBottom = y + height;
+      const visibleBottom = windowHeight - keyboardHeight - 12;
+      if (inputBottom > visibleBottom) {
+        onCommentFocus(postId, { delta: inputBottom - visibleBottom });
+      }
+    });
+  }, [allowInput, inputRef, onCommentFocus, postId, windowHeight]);
+
+  React.useEffect(() => {
+    if (!allowInput) {
+      return;
+    }
+    const handleKeyboardShow = (event: any) => {
+      keyboardHeightRef.current = event?.endCoordinates?.height ?? 0;
+      updateInputBounds();
+      requestAnimationFrame(requestScrollForInput);
+    };
+    const handleKeyboardHide = () => {
+      keyboardHeightRef.current = 0;
+      updateInputBounds();
+    };
+    const showSub = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
+    const hideSub = Keyboard.addListener('keyboardDidHide', handleKeyboardHide);
+    const raf = requestAnimationFrame(updateInputBounds);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      cancelAnimationFrame(raf);
+    };
+  }, [allowInput, requestScrollForInput, updateInputBounds]);
+
+  const handleSend = useCallback(async () => {
+    if (!text.trim()) return;
+    try {
+      await addComment(text);
+      setText('');
+      onCommentAdded?.(postId);
+    } catch (error) {
+      console.error('Error sending comment:', error);
+    } finally {
+      dismissKeyboard();
+    }
+  }, [addComment, dismissKeyboard, onCommentAdded, postId, text]);
+
+  const maxContainerHeight = Math.min(Math.round(windowHeight * 0.6), 520);
+  const focusedContainerHeight = Math.min(Math.round(windowHeight * 0.5), 440);
+  const containerHeight = inputFocused ? focusedContainerHeight : maxContainerHeight;
+  const isCompact = layout === 'compact';
+  const shouldFixHeight = !isCompact && allowInput;
+  const commentRowMinHeight = 56;
+  const commentGap = 8;
+  const compactMaxVisible = 4;
+  const compactListMaxHeight =
+    commentRowMinHeight * compactMaxVisible + commentGap * (compactMaxVisible - 1);
+  const noInputListMaxHeight = Math.min(Math.round(windowHeight * 0.4), 320);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          borderTopWidth: 1,
+          borderTopColor: palette.border,
+          paddingHorizontal: 16,
+          paddingTop: 10,
+          paddingBottom: 12,
+          backgroundColor: palette.card100,
+        },
+        listWrapper: {
+          minHeight: 0,
+        },
+        listContent: {
+          paddingBottom: 4,
+        },
+        commentCard: {
+          backgroundColor: palette.background,
+          borderRadius: 10,
+          padding: 10,
+          borderWidth: 1,
+          borderColor: palette.border,
+          marginBottom: 8,
+        },
+        commentAuthor: {
+          fontWeight: '700',
+          color: palette.text,
+          marginBottom: 4,
+          fontSize: 12,
+        },
+        commentText: { color: palette.text, lineHeight: 18, fontSize: 13 },
+        emptyState: { alignItems: 'center', paddingVertical: 10 },
+        emptyText: { color: palette.subText, textAlign: 'center', fontSize: 12 },
+        loadingRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingVertical: 10,
+        },
+        inputRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 10,
+        },
+        input: {
+          flex: 1,
+          backgroundColor: palette.background,
+          borderWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          color: palette.text,
+        },
+        sendButton: {
+          backgroundColor: palette.primary,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 10,
+          justifyContent: 'center',
+          alignItems: 'center',
+          minWidth: 48,
+        },
+        sendText: { color: palette.onPrimary, fontWeight: '700', fontSize: 12 },
+      }),
+    [palette]
+  );
+
+  const renderItem = ({ item }: { item: PostComment }) => (
+    <View style={styles.commentCard}>
+      <Text style={styles.commentAuthor}>
+        {item.user?.full_name || item.user?.username || 'User'}
+      </Text>
+      <Text style={styles.commentText}>{item.content}</Text>
+    </View>
+  );
+
+  const listContentStyle = useMemo(() => {
+    if (isCompact || !allowInput) {
+      return styles.listContent;
+    }
+    return [
+      styles.listContent,
+      { flexGrow: 1, justifyContent: comments.length ? 'flex-end' : 'center' },
+    ];
+  }, [allowInput, comments.length, isCompact, styles.listContent]);
+
+  const listWrapperStyle = useMemo(
+    () => [
+      styles.listWrapper,
+      isCompact
+        ? { maxHeight: compactListMaxHeight }
+        : shouldFixHeight
+          ? { flex: 1, minHeight: 120 }
+          : null,
+    ],
+    [compactListMaxHeight, isCompact, shouldFixHeight, styles.listWrapper]
+  );
+
+  const containerStyle = useMemo(
+    () => [styles.container, shouldFixHeight && { height: containerHeight }],
+    [containerHeight, shouldFixHeight, styles.container]
+  );
+
+  const handleListScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const paddingToBottom = 12;
+    const atBottom =
+      contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
+    setIsAtBottom(atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback((animated = false) => {
+    if (isCompact) {
+      scrollRef.current?.scrollToEnd({ animated });
+      return;
+    }
+    if (!allowInput) {
+      return;
+    }
+    listRef.current?.scrollToEnd({ animated });
+  }, [allowInput, isCompact]);
+
+  React.useEffect(() => {
+    if (!isAtBottom) return;
+    const raf = requestAnimationFrame(() => scrollToBottom(false));
+    return () => cancelAnimationFrame(raf);
+  }, [comments.length, isAtBottom, scrollToBottom]);
+
+  const content = (
+    <View style={containerStyle}>
+      <View
+        style={listWrapperStyle}
+        onStartShouldSetResponderCapture={() => {
+          if (inputFocusedRef.current) {
+            dismissKeyboard();
+          }
+          return false;
+        }}
+      >
+        {loading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={palette.text} />
+            <Text style={{ color: palette.subText }}>Loading comments...</Text>
+          </View>
+        ) : isCompact ? (
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={listContentStyle}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={comments.length > compactMaxVisible}
+            onScroll={handleListScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={() => {
+              if (isAtBottom) {
+                scrollToBottom(false);
+              }
+            }}
+          >
+            {comments.length ? (
+              comments.map((item) => (
+                <View key={item.id} style={styles.commentCard}>
+                  <Text style={styles.commentAuthor}>
+                    {item.user?.full_name || item.user?.username || 'User'}
+                  </Text>
+                  <Text style={styles.commentText}>{item.content}</Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No comments yet. Start the conversation!</Text>
+              </View>
+            )}
+          </ScrollView>
+        ) : allowInput ? (
+          <FlatList
+            ref={listRef}
+            data={comments}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No comments yet. Start the conversation!</Text>
+              </View>
+            }
+            contentContainerStyle={listContentStyle}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={!isCompact || comments.length > compactMaxVisible}
+            style={isCompact ? undefined : { flex: 1 }}
+            onScroll={handleListScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={(_width, _height) => {
+              if (isAtBottom) {
+                scrollToBottom(false);
+              }
+            }}
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={listContentStyle}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={comments.length > compactMaxVisible}
+            style={{ maxHeight: noInputListMaxHeight }}
+          >
+            {comments.length ? (
+              comments.map((item) => (
+                <View key={item.id} style={styles.commentCard}>
+                  <Text style={styles.commentAuthor}>
+                    {item.user?.full_name || item.user?.username || 'User'}
+                  </Text>
+                  <Text style={styles.commentText}>{item.content}</Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No comments yet. Start the conversation!</Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
+
+      {allowInput ? (
+        <View style={styles.inputRow}>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder={session ? 'Add a comment...' : 'Sign in to add a comment'}
+            placeholderTextColor={palette.subText}
+            value={text}
+            onChangeText={setText}
+            editable={!!session && !submitting}
+            multiline
+            onFocus={() => {
+              inputFocusedRef.current = true;
+              setInputFocused(true);
+              requestAnimationFrame(updateInputBounds);
+              requestAnimationFrame(requestScrollForInput);
+            }}
+            onBlur={() => {
+              inputFocusedRef.current = false;
+              setInputFocused(false);
+            }}
+            onLayout={updateInputBounds}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, { opacity: submitting || !text.trim() ? 0.6 : 1 }]}
+            onPress={handleSend}
+            disabled={!session || submitting || !text.trim()}
+          >
+            {submitting ? (
+              <ActivityIndicator color={palette.onPrimary} />
+            ) : (
+              <Text style={styles.sendText}>Send</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  if (isCompact || !allowInput) {
+    return content;
+  }
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
+      {content}
+    </KeyboardAvoidingView>
+  );
+};
+
+export const PostComponent: React.FC<PostComponentProps> = ({
+  post,
+  onLike,
+  onComment,
+  onDelete,
+  onUserPress,
+  onCommentAdded,
+  forceCommentsOpen,
+  onCommentFocus,
+  commentsLayout = 'expanded',
+  allowCommentInput = true,
+}) => {
   const { palette } = useTheme();
   const commentCount = post.commentsCount ?? post.comments?.length ?? 0;
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const forceOpenRef = useRef(false);
+  const commentInputRef = useRef<TextInput>(null);
+  const commentInputFocusedRef = useRef(false);
+  const commentInputBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  const updateCommentInputBounds = useCallback(() => {
+    if (!commentInputRef.current) return;
+    commentInputRef.current.measureInWindow((x, y, width, height) => {
+      commentInputBoundsRef.current = { x, y, width, height };
+    });
+  }, []);
+
+  const dismissInlineKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+    commentInputRef.current?.blur();
+  }, []);
+
+  const handleRootTouchStart = useCallback((event: any) => {
+    if (!commentsOpen) {
+      return;
+    }
+    const { pageX, pageY, target } = event.nativeEvent;
+    const inputHandle = commentInputRef.current ? findNodeHandle(commentInputRef.current) : null;
+    if (inputHandle != null && target === inputHandle) {
+      return;
+    }
+    const bounds = commentInputBoundsRef.current;
+    if (bounds) {
+      const inside =
+        pageX >= bounds.x &&
+        pageX <= bounds.x + bounds.width &&
+        pageY >= bounds.y &&
+        pageY <= bounds.y + bounds.height;
+      if (!inside) {
+        dismissInlineKeyboard();
+      }
+      return;
+    }
+    dismissInlineKeyboard();
+  }, [commentsOpen, dismissInlineKeyboard]);
+
+  const handleRootStartCapture = useCallback((event: any) => {
+    handleRootTouchStart(event);
+    return false;
+  }, [handleRootTouchStart]);
+
+  React.useEffect(() => {
+    if (forceCommentsOpen && !forceOpenRef.current) {
+      setCommentsOpen(true);
+      forceOpenRef.current = true;
+      return;
+    }
+    if (!forceCommentsOpen) {
+      forceOpenRef.current = false;
+    }
+  }, [forceCommentsOpen]);
+
+  React.useEffect(() => {
+    if (commentsOpen) {
+      const raf = requestAnimationFrame(updateCommentInputBounds);
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [commentsOpen, updateCommentInputBounds]);
+
+  const handleCommentPress = useCallback(() => {
+    Keyboard.dismiss();
+    onComment?.(post.id);
+    setCommentsOpen((prev) => {
+      const next = !prev;
+      if (next && commentsLayout === 'expanded') {
+        onCommentFocus?.(post.id);
+      }
+      return next;
+    });
+  }, [commentsLayout, onComment, onCommentFocus, post.id]);
 
   const formatTimestamp = (timestamp: string) => {
     const now = new Date();
@@ -143,6 +623,9 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
     },
+    actionButtonActive: {
+      opacity: 0.9,
+    },
     actionText: {
       marginLeft: 6,
       fontSize: 14,
@@ -151,10 +634,20 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
   });
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onTouchStart={handleRootTouchStart}
+      onStartShouldSetResponderCapture={handleRootStartCapture}
+    >
       {/* Post Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => onUserPress?.(post.user.id, post.user.username)} activeOpacity={0.8}>
+        <TouchableOpacity
+          onPress={() => {
+            Keyboard.dismiss();
+            onUserPress?.(post.user.id, post.user.username);
+          }}
+          activeOpacity={0.8}
+        >
           <View style={styles.avatar}>
             {post.user.avatar ? (
               <Image source={{ uri: post.user.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} />
@@ -166,7 +659,13 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
         
         <View style={styles.userInfo}>
           <View style={styles.usernameRow}>
-            <TouchableOpacity onPress={() => onUserPress?.(post.user.id, post.user.username)} activeOpacity={0.8}>
+            <TouchableOpacity
+              onPress={() => {
+                Keyboard.dismiss();
+                onUserPress?.(post.user.id, post.user.username);
+              }}
+              activeOpacity={0.8}
+            >
               <Text style={styles.username}>
                 {post.user.username}
               </Text>
@@ -248,7 +747,10 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
           style={styles.actionButton}
-          onPress={() => onLike(post.id)}
+          onPress={() => {
+            Keyboard.dismiss();
+            onLike(post.id);
+          }}
         >
           <Ionicons 
             name={post.isLiked ? "heart" : "heart-outline"} 
@@ -261,10 +763,10 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => onComment(post.id)}
+          style={[styles.actionButton, commentsOpen && styles.actionButtonActive]}
+          onPress={handleCommentPress}
         >
-          <Ionicons name="chatbubble-outline" size={20} color={palette.text} />
+          <Ionicons name={commentsOpen ? "chatbubble" : "chatbubble-outline"} size={20} color={palette.text} />
           <Text style={[styles.actionText, { color: palette.text }]}>
             {commentCount}
           </Text>
@@ -273,7 +775,10 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
         {onDelete ? (
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => onDelete(post.id)}
+            onPress={() => {
+              Keyboard.dismiss();
+              onDelete(post.id);
+            }}
           >
             <Ionicons name="trash-outline" size={22} color={palette.text} />
             <Text style={[styles.actionText, { color: palette.text }]}>
@@ -281,7 +786,12 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
             </Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              Keyboard.dismiss();
+            }}
+          >
             <Ionicons name="share-outline" size={22} color={palette.text} />
             <Text style={[styles.actionText, { color: palette.text }]}>
               Share
@@ -289,6 +799,19 @@ export const PostComponent: React.FC<PostComponentProps> = ({ post, onLike, onCo
           </TouchableOpacity>
         )}
       </View>
+
+      {commentsOpen && (
+        <InlineComments
+          postId={post.id}
+          onCommentAdded={onCommentAdded}
+          onCommentFocus={onCommentFocus}
+          inputRef={commentInputRef}
+          inputFocusedRef={commentInputFocusedRef}
+          updateInputBounds={updateCommentInputBounds}
+          layout={commentsLayout}
+          allowInput={allowCommentInput}
+        />
+      )}
     </View>
   );
 };
