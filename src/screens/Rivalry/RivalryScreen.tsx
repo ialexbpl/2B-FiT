@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,11 +12,12 @@ export const RivalryScreen = () => {
     const [summary, setSummary] = React.useState<any>(null);
     const [activeChallenges, setActiveChallenges] = React.useState<any[]>([]);
     const [userRank, setUserRank] = React.useState<number | null>(null);
-    // const [loading, setLoading] = React.useState(false); // Unused for now, but good practice
+    const [loading, setLoading] = React.useState(true);
 
     useFocusEffect(
         React.useCallback(() => {
             const loadData = async () => {
+                setLoading(true);
                 try {
                     const { supabase } = require('../../utils/supabase');
                     const { getActiveChallenges, getLeaderboard } = require('../../api/rivalryService');
@@ -26,20 +27,21 @@ export const RivalryScreen = () => {
                         const challenges = await getActiveChallenges(user.id);
                         setActiveChallenges(challenges);
 
-                        // Fetch leaderboard to find user's rank AND weekly stats
                         const leaderboard = await getLeaderboard('weekly');
                         const rankIndex = leaderboard.findIndex((entry: any) => entry.user_id === user.id);
                         if (rankIndex >= 0) {
-                            setUserRank(rankIndex + 1); // Rank is 1-indexed
-                            // Use weekly stats from leaderboard for consistency
+                            setUserRank(rankIndex + 1);
                             setSummary(leaderboard[rankIndex]);
                         } else {
-                            setUserRank(null); // User not in leaderboard (0 matches this week)
+                            setUserRank(null);
                             setSummary({ points: 0, wins: 0, matches_played: 0 });
                         }
                     }
                 } catch (e) {
-                    console.error("Failed to load rivalry data", e);
+                    console.warn("Failed to load rivalry data", e);
+                    setSummary({ points: 0, wins: 0, matches_played: 0 });
+                } finally {
+                    setLoading(false);
                 }
             };
             loadData();
@@ -47,118 +49,172 @@ export const RivalryScreen = () => {
     );
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+        <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={['top']}>
+            {/* Fixed Header */}
+            <View style={[styles.header, { backgroundColor: palette.background, borderBottomColor: palette.border }]}>
+                <Pressable onPress={() => navigation.navigate('Dashboard')} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={palette.text} />
+                </Pressable>
+                <Text style={[styles.headerTitle, { color: palette.text }]}>Rivalry</Text>
+                <View style={{ width: 40 }} />
+            </View>
 
-                {/* Header */}
-                <View style={styles.header}>
-                    <Pressable onPress={() => navigation.navigate('Dashboard')} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color={palette.text} />
-                    </Pressable>
-                    <Text style={[styles.headerTitle, { color: palette.text }]}>Rywalizacja</Text>
-                    <View style={{ width: 40 }} />
-                </View>
-
-                {/* Hero Section - User Rank */}
-                <LinearGradient
-                    colors={[theme.colors.primary, '#16a34a']} // Gradient based on primary color
-                    style={styles.heroCard}
-                >
-                    <View style={styles.heroContent}>
-                        <View>
-                            <Text style={styles.heroLabel}>Twoja Pozycja</Text>
-                            <Text style={styles.heroRank}>{userRank ? `#${userRank}` : '--'}</Text>
-                            <Text style={styles.heroSubtext}>
-                                {summary?.points > 0 ? `${summary.points} punktów` : 'Rozpocznij wyzwanie!'}
-                            </Text>
-                        </View>
-                        <View style={styles.trophyContainer}>
-                            <Ionicons name="trophy" size={64} color="#FFD700" />
-                        </View>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                        <Text style={[styles.loadingText, { color: palette.subText }]}>Loading...</Text>
                     </View>
-                    <Pressable
-                        style={styles.heroButton}
-                        onPress={() => navigation.navigate('Leaderboard')}
-                    >
-                        <Text style={[styles.heroButtonText, { color: theme.colors.primary }]}>Zobacz Ranking</Text>
-                        <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
-                    </Pressable>
-                </LinearGradient>
-
-                {/* Stats Grid */}
-                <View style={styles.statsGrid}>
-                    <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                        <Text style={[styles.statValue, { color: palette.text }]}>{summary?.matches_played || 0}</Text>
-                        <Text style={[styles.statLabel, { color: palette.subText }]}>Wyzwania (7 dni)</Text>
-                    </View>
-                    <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                        <Text style={[styles.statValue, { color: theme.colors.success }]}>{summary?.wins || 0}</Text>
-                        <Text style={[styles.statLabel, { color: palette.subText }]}>Wygrane (7 dni)</Text>
-                    </View>
-                    <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                        <Text style={[styles.statValue, { color: theme.colors.danger }]}>{summary?.points || 0}</Text>
-                        <Text style={[styles.statLabel, { color: palette.subText }]}>Punkty (7 dni)</Text>
-                    </View>
-                </View>
-
-                {/* Active Challenges Preview */}
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: palette.text }]}>Aktywne Wyzwania</Text>
-                    <Pressable onPress={() => navigation.navigate('Challenges')}>
-                        <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Zobacz wszystkie</Text>
-                    </Pressable>
-                </View>
-
-                {activeChallenges.length > 0 ? (
-                    activeChallenges.map((challenge, index) => (
-                        <Pressable
-                            key={index}
-                            style={[styles.challengeCard, { backgroundColor: palette.card, borderColor: palette.border }]}
-                            onPress={() => navigation.navigate('Duel', { challengeId: challenge.id })}
-                        >
-                            <View style={styles.challengeHeader}>
-                                <View style={styles.userInfo}>
-                                    <View style={[styles.avatar, { backgroundColor: '#ddd' }]}>
-                                        {challenge.opponent?.avatar_url &&
-                                            <Image source={{ uri: challenge.opponent.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                                        }
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.userName, { color: palette.text }]}>{challenge.opponent?.full_name || 'Przeciwnik'}</Text>
-                                        <Text style={[styles.challengeType, { color: palette.subText }]}>{challenge.challenge_type} • {challenge.duration_hours}h</Text>
-                                    </View>
-                                </View>
-                                <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning }]}>
-                                    <Text style={styles.statusText}>Trwa</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.progressContainer}>
-                                <View style={styles.progressBar}>
-                                    <View style={[styles.progressFill, { width: '50%', backgroundColor: theme.colors.primary }]} />
-                                </View>
-                                <View style={styles.progressLabels}>
-                                    <Text style={[styles.progressText, { color: palette.subText }]}>Ty: {challenge.challenger_progress}</Text>
-                                    <Text style={[styles.progressText, { color: palette.subText }]}>Cel: {challenge.target_value}</Text>
-                                </View>
-                            </View>
-                        </Pressable>
-                    ))
                 ) : (
-                    <Text style={{ color: palette.subText, marginBottom: 20, fontStyle: 'italic' }}>Brak aktywnych wyzwań.</Text>
+                    <>
+                        {/* Hero Section - User Rank */}
+                        <LinearGradient
+                            colors={[theme.colors.primary, '#16a34a']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.heroCard}
+                        >
+                            <View style={styles.heroContent}>
+                                <View style={styles.heroLeft}>
+                                    <Text style={styles.heroLabel}>Your Rank</Text>
+                                    <Text style={styles.heroRank}>{userRank ? `#${userRank}` : '--'}</Text>
+                                    <Text style={styles.heroSubtext}>
+                                        {summary?.points > 0 ? `${summary.points} points` : 'Start a challenge!'}
+                                    </Text>
+                                </View>
+                                <View style={styles.trophyContainer}>
+                                    <Ionicons name="trophy" size={56} color="#FFD700" />
+                                </View>
+                            </View>
+                            <Pressable
+                                style={styles.heroButton}
+                                onPress={() => navigation.navigate('Leaderboard')}
+                            >
+                                <Text style={[styles.heroButtonText, { color: theme.colors.primary }]}>View Leaderboard</Text>
+                                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+                            </Pressable>
+                        </LinearGradient>
+
+                        {/* Stats Grid */}
+                        <View style={styles.statsSection}>
+                            <Text style={[styles.sectionLabel, { color: palette.subText }]}>This Week</Text>
+                            <View style={styles.statsGrid}>
+                                <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <View style={[styles.statIconContainer, { backgroundColor: theme.colors.primary + '15' }]}>
+                                        <Ionicons name="flash" size={20} color={theme.colors.primary} />
+                                    </View>
+                                    <Text style={[styles.statValue, { color: palette.text }]}>{summary?.matches_played || 0}</Text>
+                                    <Text style={[styles.statLabel, { color: palette.subText }]}>Challenges</Text>
+                                </View>
+                                <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <View style={[styles.statIconContainer, { backgroundColor: theme.colors.success + '15' }]}>
+                                        <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+                                    </View>
+                                    <Text style={[styles.statValue, { color: theme.colors.success }]}>{summary?.wins || 0}</Text>
+                                    <Text style={[styles.statLabel, { color: palette.subText }]}>Wins</Text>
+                                </View>
+                                <View style={[styles.statCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <View style={[styles.statIconContainer, { backgroundColor: theme.colors.warning + '15' }]}>
+                                        <Ionicons name="star" size={20} color={theme.colors.warning} />
+                                    </View>
+                                    <Text style={[styles.statValue, { color: theme.colors.warning }]}>{summary?.points || 0}</Text>
+                                    <Text style={[styles.statLabel, { color: palette.subText }]}>Points</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Active Challenges Section */}
+                        <View style={styles.challengesSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: palette.text }]}>Active Challenges</Text>
+                                <Pressable 
+                                    onPress={() => navigation.navigate('Challenges')}
+                                    style={styles.viewAllButton}
+                                >
+                                    <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 14 }}>View All</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={theme.colors.primary} />
+                                </Pressable>
+                            </View>
+
+                            {activeChallenges.length > 0 ? (
+                                activeChallenges.slice(0, 3).map((challenge, index) => (
+                                    <Pressable
+                                        key={challenge.id || index}
+                                        style={[styles.challengeCard, { backgroundColor: palette.card, borderColor: palette.border }]}
+                                        onPress={() => navigation.navigate('Duel', { challengeId: challenge.id })}
+                                    >
+                                        <View style={styles.challengeHeader}>
+                                            <View style={styles.userInfo}>
+                                                <View style={[styles.avatar, { backgroundColor: theme.colors.primary + '20' }]}>
+                                                    {challenge.opponent?.avatar_url ? (
+                                                        <Image 
+                                                            source={{ uri: challenge.opponent.avatar_url }} 
+                                                            style={styles.avatarImage} 
+                                                        />
+                                                    ) : (
+                                                        <Ionicons name="person" size={20} color={theme.colors.primary} />
+                                                    )}
+                                                </View>
+                                                <View style={styles.challengeInfo}>
+                                                    <Text style={[styles.userName, { color: palette.text }]}>
+                                                        {challenge.opponent?.full_name || 'Opponent'}
+                                                    </Text>
+                                                    <Text style={[styles.challengeType, { color: palette.subText }]}>
+                                                        {challenge.challenge_type} • {challenge.duration_hours}h
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning + '20' }]}>
+                                                <Text style={[styles.statusText, { color: theme.colors.warning }]}>Active</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.progressContainer}>
+                                            <View style={[styles.progressBar, { backgroundColor: palette.border }]}>
+                                                <View 
+                                                    style={[
+                                                        styles.progressFill, 
+                                                        { 
+                                                            width: `${Math.min((challenge.challenger_progress / challenge.target_value) * 100, 100)}%`, 
+                                                            backgroundColor: theme.colors.primary 
+                                                        }
+                                                    ]} 
+                                                />
+                                            </View>
+                                            <View style={styles.progressLabels}>
+                                                <Text style={[styles.progressText, { color: palette.text }]}>
+                                                    You: {challenge.challenger_progress || 0}
+                                                </Text>
+                                                <Text style={[styles.progressText, { color: palette.subText }]}>
+                                                    Goal: {challenge.target_value}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </Pressable>
+                                ))
+                            ) : (
+                                <View style={[styles.emptyState, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                                    <Ionicons name="fitness-outline" size={48} color={palette.subText} />
+                                    <Text style={[styles.emptyTitle, { color: palette.text }]}>No Active Challenges</Text>
+                                    <Text style={[styles.emptySubtext, { color: palette.subText }]}>
+                                        Start a quick match to compete with others!
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Quick Match Button */}
+                        <View style={styles.actionsContainer}>
+                            <Pressable
+                                style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
+                                onPress={() => navigation.navigate('Duel', { isQuickMatch: true })}
+                            >
+                                <Ionicons name="flash" size={24} color="#fff" />
+                                <Text style={styles.actionButtonText}>Quick Match</Text>
+                            </Pressable>
+                        </View>
+                    </>
                 )}
-
-                {/* Acton Buttons */}
-                <View style={styles.actionsContainer}>
-                    <Pressable
-                        style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
-                        onPress={() => navigation.navigate('Duel', { isQuickMatch: true })}
-                    >
-                        <Ionicons name="flash" size={24} color="#fff" />
-                        <Text style={styles.actionButtonText}>Szybki Pojedynek</Text>
-                    </Pressable>
-                </View>
-
             </ScrollView>
         </SafeAreaView>
     );
@@ -168,63 +224,78 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    scrollContent: {
-        padding: 20,
-        paddingBottom: 40,
-    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
     },
     backButton: {
         padding: 8,
         marginLeft: -8,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 30,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 80,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
     },
     heroCard: {
-        borderRadius: 24,
-        padding: 24,
-        marginBottom: 24,
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 12,
         shadowColor: "#22c55e",
-        shadowOffset: {
-            width: 0,
-            height: 8,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
         elevation: 10,
     },
     heroContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 14,
+    },
+    heroLeft: {
+        flex: 1,
     },
     heroLabel: {
-        color: 'rgba(255,255,255,0.8)',
+        color: 'rgba(255,255,255,0.85)',
         fontSize: 14,
         fontWeight: '600',
         marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     heroRank: {
         color: '#fff',
-        fontSize: 48,
+        fontSize: 44,
         fontWeight: '800',
-        lineHeight: 56,
+        lineHeight: 50,
     },
     heroSubtext: {
-        color: '#fff',
-        fontSize: 14,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 15,
         fontWeight: '500',
-        opacity: 0.9,
+        marginTop: 4,
     },
     trophyContainer: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(255,255,255,0.15)',
         padding: 12,
         borderRadius: 20,
     },
@@ -233,91 +304,129 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 16,
-        gap: 8,
+        paddingVertical: 10,
+        borderRadius: 12,
+        gap: 6,
     },
     heroButtonText: {
         fontWeight: '700',
-        fontSize: 14,
+        fontSize: 15,
+    },
+    statsSection: {
+        marginBottom: 12,
+    },
+    sectionLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
     },
     statsGrid: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 32,
+        gap: 8,
     },
     statCard: {
         flex: 1,
-        padding: 16,
-        borderRadius: 20,
+        padding: 12,
+        borderRadius: 16,
         alignItems: 'center',
         borderWidth: 1,
     },
+    statIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
     statValue: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '800',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     statLabel: {
         fontSize: 12,
         fontWeight: '500',
     },
+    challengesSection: {
+        marginBottom: 12,
+    },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 10,
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '700',
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
     },
     challengeCard: {
-        borderRadius: 20,
-        padding: 16,
+        borderRadius: 16,
+        padding: 14,
         borderWidth: 1,
-        marginBottom: 24,
+        marginBottom: 10,
     },
     challengeHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
+        flex: 1,
     },
     avatar: {
         width: 40,
         height: 40,
         borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+    },
+    challengeInfo: {
+        flex: 1,
     },
     userName: {
         fontWeight: '700',
         fontSize: 16,
+        marginBottom: 2,
     },
     challengeType: {
-        fontSize: 12,
+        fontSize: 13,
+        textTransform: 'capitalize',
     },
     statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
     },
     statusText: {
-        color: '#fff',
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     progressContainer: {
-        gap: 8,
+        gap: 6,
     },
     progressBar: {
         height: 8,
-        backgroundColor: '#E2E8F0',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -330,31 +439,45 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     progressText: {
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    emptyState: {
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginTop: 12,
+        marginBottom: 4,
+    },
+    emptySubtext: {
+        fontSize: 14,
+        textAlign: 'center',
     },
     actionsContainer: {
-        marginTop: 8,
+        marginTop: 4,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
-        borderRadius: 20,
-        gap: 12,
+        padding: 14,
+        borderRadius: 16,
+        gap: 10,
         shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
         shadowRadius: 8,
         elevation: 4,
     },
     actionButtonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
     }
 });
