@@ -313,30 +313,45 @@ export const Profile: React.FC = () => {
     }
   }, [refetchPosts, refreshProfile]);
 
-  const saveBio = React.useCallback(async () => {
-    if (!session?.user) {
-      Alert.alert('Not logged in', 'Sign in to edit your bio.');
-      return;
-    }
-    setIsSavingBio(true);
-    setBioError(null);
-    try {
-      await supabase.auth.updateUser({
-        data: {
-          bio: bioInput.trim(),
-          hashtags: hashtagsInput.trim(),
-          instagram: igInput.trim(),
-          facebook: fbInput.trim(),
-        },
-      });
-      await supabase.auth.getSession();
-      setBioModalVisible(false);
-    } catch (e: any) {
-      setBioError(e?.message ?? 'Failed to save bio.');
-    } finally {
-      setIsSavingBio(false);
-    }
-  }, [bioInput, hashtagsInput, igInput, fbInput, session?.user]);
+const saveBio = React.useCallback(async () => {
+  if (!session?.user) {
+    Alert.alert('Not logged in', 'Sign in to edit your bio.');
+    return;
+  }
+
+  const igNormalized = normalizeInstagram(igInput);
+  if (igNormalized === null) {
+    setBioError('Niepoprawny link/username Instagram. Podaj @username lub link do instagram.com');
+    return;
+  }
+
+  const fbNormalized = normalizeFacebook(fbInput);
+  if (fbNormalized === null) {
+    setBioError('Niepoprawny link Facebook. Podaj link do facebook.com');
+    return;
+  }
+
+  setIsSavingBio(true);
+  setBioError(null);
+
+  try {
+    await supabase.auth.updateUser({
+      data: {
+        bio: bioInput.trim(),
+        hashtags: hashtagsInput.trim(),
+        instagram: igNormalized,
+        facebook: fbNormalized,
+      },
+    });
+    await supabase.auth.getSession();
+    setBioModalVisible(false);
+  } catch (e: any) {
+    setBioError(e?.message ?? 'Failed to save bio.');
+  } finally {
+    setIsSavingBio(false);
+  }
+}, [bioInput, hashtagsInput, igInput, fbInput, session?.user]);
+
 
   const userPosts = React.useMemo(
     () => posts.filter(post => post.user_id === session?.user?.id),
@@ -391,6 +406,72 @@ export const Profile: React.FC = () => {
       Alert.alert('Link', safe);
     });
   }, []);
+
+  const ensureHttps = (url: string) => {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+    ? trimmed
+    : `https://${trimmed}`;
+};
+
+const normalizeInstagram = (input: string): string | null => {
+  const raw = input.trim();
+  if (!raw) return '';
+
+  const asUser = raw.replace(/^@/, '');
+  if (/^[a-zA-Z0-9._]{1,30}$/.test(asUser) && !raw.includes('/') && !raw.includes(' ')) {
+    return `https://www.instagram.com/${asUser}`;
+  }
+
+  const url = ensureHttps(raw);
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+
+    if (!/(^|\.)instagram\.com$/.test(host)) return null;
+
+    const seg = u.pathname.split('/').filter(Boolean)[0];
+    if (!seg) return `https://www.instagram.com/`;
+
+    if (!/^[a-zA-Z0-9._]{1,30}$/.test(seg)) return null;
+    return `https://www.instagram.com/${seg}`;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeFacebook = (input: string): string | null => {
+  const raw = input.trim();
+  if (!raw) return '';
+
+  const url = ensureHttps(raw);
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+
+    if (!/(^|\.)facebook\.com$/.test(host)) return null;
+
+    if (u.pathname.toLowerCase() === '/profile.php') {
+      const id = u.searchParams.get('id');
+      if (!id || !/^\d+$/.test(id)) return null;
+      return `https://www.facebook.com/profile.php?id=${id}`;
+    }
+
+    const seg = u.pathname.split('/').filter(Boolean)[0];
+    if (!seg) return `https://www.facebook.com/`;
+
+    if (!/^[a-zA-Z0-9.\-]{3,100}$/.test(seg)) return null;
+    return `https://www.facebook.com/${seg}`;
+  } catch {
+    return null;
+  }
+};
+
+const isValidSocial = (kind: 'ig' | 'fb', value: string) => {
+  const normalized = kind === 'ig' ? normalizeInstagram(value) : normalizeFacebook(value);
+  return normalized !== null;
+};
 
   const dismissBioKeyboard = React.useCallback(() => {
     Keyboard.dismiss();
