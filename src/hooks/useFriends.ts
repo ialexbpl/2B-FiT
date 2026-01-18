@@ -35,7 +35,7 @@ export type FriendListEntry = {
   since: string;
 };
 
-type RelationLookupEntry = {
+export type RelationLookupEntry = {
   type: 'friend' | 'incoming' | 'outgoing' | 'declined' | 'blocked';
   friendshipId: string;
 };
@@ -295,6 +295,11 @@ export const useFriends = () => {
     return map;
   }, [relationships, userId]);
 
+  const relationForUser = useCallback(
+    (targetId: string) => relationLookup.get(targetId),
+    [relationLookup]
+  );
+
   const searchResults: FriendCandidate[] = useMemo(
     () =>
       rawCandidates.map(profile => ({
@@ -510,6 +515,7 @@ export const useFriends = () => {
     declineInvite,
     acknowledgeNotification,
     removeFriend,
+    relationForUser,
     isUserMutating,
     isFriendshipMutating,
     refresh,

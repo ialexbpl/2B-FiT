@@ -27,7 +27,7 @@ import { makeProfileStyles } from "./ProfileStyles";
 // theme palettes are provided via ThemeContext
 import { useTheme } from "../../context/ThemeContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useAuth } from "@context/AuthContext";
 import { useProfile } from "@context/ProfileContext";
 import { supabase } from "@utils/supabase";
@@ -36,7 +36,7 @@ import { CreatePostModal } from "@screens/Dashboard/community/CreatePostModal";
 import { PostComponent } from "@screens/Dashboard/community/PostComponent";
 import type { Post as LegacyPost } from "@screens/Dashboard/community/community.types";
 import { useFriends } from "@hooks/useFriends";
-import { FriendsPanel } from "./FriendsPanel";
+import { FriendsPanelContent } from "./FriendsPanel";
 import { ProfileAchivment } from "./ProfileAchivment";
 
 const fallbackAvatar = require("../../assets/logo.png");
@@ -84,11 +84,13 @@ export const Profile: React.FC = () => {
     refetch: refetchPosts,
     adjustCommentCount,
   } = usePosts();
+  const friendsState = useFriends();
   const {
     friendCount,
     incomingRequests,
     acceptanceNotifications,
-  } = useFriends();
+    refresh: refreshFriends,
+  } = friendsState;
   const [createModalVisible, setCreateModalVisible] = React.useState(false);
   const [detailPost, setDetailPost] = React.useState<LegacyPost | null>(null);
   const detailTranslateY = React.useRef(new Animated.Value(0)).current;
@@ -127,6 +129,20 @@ export const Profile: React.FC = () => {
     }),
     []
   );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchPosts();
+      refreshFriends();
+      refreshProfile?.();
+    }, [refetchPosts, refreshFriends, refreshProfile])
+  );
+
+  React.useEffect(() => {
+    if (friendsVisible) {
+      refreshFriends();
+    }
+  }, [friendsVisible, refreshFriends]);
 
   const displayName = React.useMemo(() => {
     const trimmedFullName = profile?.full_name?.trim();
@@ -575,7 +591,7 @@ const isValidSocial = (kind: 'ig' | 'fb', value: string) => {
   const headerContent = (
     <View style={styles.sectionCombined}>
       <View style={styles.headerRow}>
-        <View style={styles.topRightIcons}>
+        <View style={styles.topLeftIcons}>
           <TouchableOpacity
             style={styles.bellButton}
             onPress={() => setNotificationsVisible(true)}
@@ -586,6 +602,8 @@ const isValidSocial = (kind: 'ig' | 'fb', value: string) => {
               <View style={styles.badgeDot} />
             )}
           </TouchableOpacity>
+        </View>
+        <View style={styles.topRightIcons}>
           <TouchableOpacity
             style={styles.chatButton}
             onPress={() => navigation.navigate('ChatList')}
@@ -922,7 +940,7 @@ const isValidSocial = (kind: 'ig' | 'fb', value: string) => {
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, marginTop: 8 }}>
-            <FriendsPanel />
+            <FriendsPanelContent friendsState={friendsState} />
           </View>
         </View>
       </Modal>

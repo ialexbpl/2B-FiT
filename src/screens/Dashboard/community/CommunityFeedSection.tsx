@@ -1,6 +1,6 @@
 // CommunityFeedSection.tsx - WITH PAGER VIEW SUPPORT
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet, Text, Alert, Platform } from 'react-native';
+import { View, FlatList, TouchableOpacity, StyleSheet, Text, Alert, Platform, Keyboard } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
@@ -26,6 +26,8 @@ export const CommunityFeedSection: React.FC<Props> = ({
   const [filteredUsername, setFilteredUsername] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const scrollOffsetRef = useRef(0);
   const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
@@ -36,6 +38,17 @@ export const CommunityFeedSection: React.FC<Props> = ({
       setLastRefresh(new Date());
     }
   }, [createModalVisible]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleScroll = useCallback((event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -89,6 +102,12 @@ export const CommunityFeedSection: React.FC<Props> = ({
     return list;
   }, [posts, filteredUserId, session?.user?.id]);
 
+  useEffect(() => {
+    if (openCommentsPostId && !visiblePosts.some(post => post.id === openCommentsPostId)) {
+      setOpenCommentsPostId(null);
+    }
+  }, [openCommentsPostId, visiblePosts]);
+
   const postIndexMap = useMemo(
     () => new Map(visiblePosts.map((post, index) => [post.id, index])),
     [visiblePosts]
@@ -97,6 +116,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
   const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
     if (options?.delta != null && options.delta > 0) {
       const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      scrollOffsetRef.current = nextOffset;
       flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
       return;
     }
@@ -219,12 +239,17 @@ export const CommunityFeedSection: React.FC<Props> = ({
     );
   }
 
+  const keyboardVisible = keyboardHeight > 0;
+  const contentPaddingBottom =
+    openCommentsPostId && keyboardHeight ? keyboardHeight + 16 : 0;
+
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={visiblePosts}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: contentPaddingBottom }}
         renderItem={({ item }) => (
           <PostComponent
             post={convertToLegacyPost(item)}
@@ -232,6 +257,10 @@ export const CommunityFeedSection: React.FC<Props> = ({
             onCommentAdded={() => adjustCommentCount(item.id, 1)}
             onCommentFocus={scrollToPost}
             commentsLayout="compact"
+            commentsOpen={openCommentsPostId === item.id}
+            onCommentsToggle={(_postId, nextOpen) => {
+              setOpenCommentsPostId(nextOpen ? item.id : null);
+            }}
             onUserPress={async (userId, username) => {
               if (userId !== session?.user?.id) {
                 try {
@@ -300,7 +329,7 @@ export const CommunityFeedSection: React.FC<Props> = ({
         showsVerticalScrollIndicator={true}
       />
 
-      {posts.length > 0 && (
+      {posts.length > 0 && !keyboardVisible && (
         <TouchableOpacity 
           style={styles.fab}
           onPress={() => setCreateModalVisible(true)}

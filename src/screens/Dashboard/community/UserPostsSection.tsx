@@ -1,6 +1,6 @@
 // UserPostsSection.tsx - user feed with profile header
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Modal, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Modal, TextInput, ActivityIndicator, Alert, Platform, Keyboard } from 'react-native';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { PostComponent } from './PostComponent';
@@ -29,6 +29,8 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const [fbInput, setFbInput] = useState('');
   const [bioError, setBioError] = useState<string | null>(null);
   const [isSavingBio, setIsSavingBio] = useState(false);
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollOffsetRef = useRef(0);
   const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
@@ -42,6 +44,23 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
     () => userPosts.reduce((acc, post) => acc + (post.likes_count || 0), 0),
     [userPosts]
   );
+
+  useEffect(() => {
+    if (openCommentsPostId && !userPosts.some(post => post.id === openCommentsPostId)) {
+      setOpenCommentsPostId(null);
+    }
+  }, [openCommentsPostId, userPosts]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!createModalVisible) {
@@ -100,6 +119,7 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
   const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
     if (options?.delta != null && options.delta > 0) {
       const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      scrollOffsetRef.current = nextOffset;
       flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
       return;
     }
@@ -290,6 +310,10 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
         ref={flatListRef}
         data={userPosts}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          paddingBottom:
+            openCommentsPostId && keyboardHeight ? keyboardHeight + 16 : 0,
+        }}
         renderItem={({ item }) => (
           <PostComponent
             post={convertToLegacyPost(item, displayName)}
@@ -298,6 +322,10 @@ export const UserPostsSection: React.FC<Props> = ({ availableHeight }) => {
             onDelete={() => deletePost(item.id)}
             onCommentFocus={scrollToPost}
             commentsLayout="compact"
+            commentsOpen={openCommentsPostId === item.id}
+            onCommentsToggle={(_postId, nextOpen) => {
+              setOpenCommentsPostId(nextOpen ? item.id : null);
+            }}
           />
         )}
         refreshing={refreshing}
