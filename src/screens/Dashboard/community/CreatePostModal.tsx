@@ -1,17 +1,22 @@
 // community/CreatePostModal.tsx
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Modal, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
   Image,
   Alert,
   StyleSheet,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,6 +35,7 @@ const DEFAULT_POST_TYPE: PostType = 'progress';
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClose, onCreated }) => {
   const { palette } = useTheme();
+  const insets = useSafeAreaInsets();
   const { createPost } = usePosts();
   const { profile } = useAuth();
   
@@ -213,7 +219,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
       backgroundColor: palette.card100,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
-      maxHeight: '90%',
+      height: '90%',
+      paddingBottom: insets.bottom,
+      flexShrink: 1,
     },
     header: {
       flexDirection: 'row' as const,
@@ -230,6 +238,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
     },
     content: {
       padding: 16,
+      flex: 1,
     },
     textInput: {
       backgroundColor: palette.background,
@@ -388,26 +397,39 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
       onRequestClose={onClose}
       onShow={resetForm}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Create Post</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={palette.text} />
-            </TouchableOpacity>
-          </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
+            <View style={styles.container}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Create Post</Text>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="close" size={24} color={palette.text} />
+                </TouchableOpacity>
+              </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Content Input */}
-            <TextInput
-              style={styles.textInput}
-              placeholder="What's on your mind?... Share your fitness journey!"
-              placeholderTextColor={palette.subText}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              maxLength={500}
-            />
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                style={{ flex: 1 }}
+              >
+                <ScrollView
+                  style={styles.content}
+                  contentContainerStyle={{ paddingBottom: 24 }}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                >
+                  {/* Content Input */}
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="What's on your mind?... Share your fitness journey!"
+                    placeholderTextColor={palette.subText}
+                    value={content}
+                    onChangeText={setContent}
+                    multiline
+                    maxLength={500}
+                  />
 
             {/* Image Picker */}
             <View style={styles.imageContainer}>
@@ -592,33 +614,36 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ visible, onClo
               )}
             </View>
 
-            {/* Actions */}
-            <View style={styles.actions}>
-              <TouchableOpacity 
-                style={[styles.button, styles.cancelButton]}
-                onPress={onClose}
-                disabled={loading}
-              >
-                <Text style={[styles.buttonText, { color: palette.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.button, styles.submitButton]}
-                onPress={handleSubmit}
-                disabled={loading || uploading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color={palette.onPrimary} />
-                ) : (
-                  <Text style={[styles.buttonText, { color: palette.onPrimary }]}>
-                    Post
-                  </Text>
-                )}
-              </TouchableOpacity>
+                {/* Actions */}
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    style={[styles.button, styles.cancelButton]}
+                    onPress={onClose}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.buttonText, { color: palette.text }]}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.button, styles.submitButton]}
+                    onPress={handleSubmit}
+                    disabled={loading || uploading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color={palette.onPrimary} />
+                    ) : (
+                      <Text style={[styles.buttonText, { color: palette.onPrimary }]}>
+                        Post
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
             </View>
-          </ScrollView>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };

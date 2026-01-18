@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pedometer } from 'expo-sensors';
+import { getStepsForRange } from '@hooks/useSteps';
 
 const DURATION_OPTIONS = [
     { label: '1 Hour', value: 1 },
@@ -123,14 +123,9 @@ export const DuelScreen = ({ route }: any) => {
                 const updated = await fetchChallenge(challenge.id);
                 if (!updated) return;
 
-                const { granted } = await Pedometer.requestPermissionsAsync();
-                if (!granted) return;
-
-                const available = await Pedometer.isAvailableAsync();
-                if (!available) return;
-
                 const currentTime = new Date();
-                const result = await Pedometer.getStepCountAsync(startTime, currentTime);
+                const result = await getStepsForRange(startTime, currentTime);
+                if (result.source === 'unavailable') return;
                 const totalSteps = result.steps;
 
                 setLocalSteps(totalSteps);

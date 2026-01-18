@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator, Platform, Keyboard } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@context/ThemeContext';
 import { useAuth } from '@context/AuthContext';
 import { usePosts } from '../../../hooks/usePosts';
+import { useFriends } from '@hooks/useFriends';
 import { PostComponent } from './PostComponent';
 import { fetchUserProfile, type UserProfileDetails } from '../../../api/userService';
 import { supabase } from '@utils/supabase';
@@ -18,20 +19,82 @@ export const UserProfileScreen: React.FC = () => {
   const { palette } = useTheme();
   const { session } = useAuth();
   const { posts, refreshing, likePost, refetch, adjustCommentCount } = usePosts();
+  const {
+    sendInvite,
+    cancelInvite,
+    acceptInvite,
+    declineInvite,
+    removeFriend,
+    isUserMutating,
+    isFriendshipMutating,
+    relationForUser,
+    relationshipsLoading,
+  } = useFriends();
   const [displayName, setDisplayName] = useState(username || 'User');
   const [profileData, setProfileData] = useState<UserProfileDetails | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isSelf = session?.user?.id === userId;
   const flatListRef = useRef<FlatList>(null);
   const scrollOffsetRef = useRef(0);
   const commentScrollOffset = Platform.OS === 'ios' ? 200 : 160;
+
+  const safeAction = useCallback(async (runner: () => Promise<void>) => {
+    try {
+      await runner();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      Alert.alert('Oops!', message);
+    }
+  }, []);
+
+  const relation = !isSelf ? relationForUser(userId) : undefined;
+  const relationType = relation?.type === 'declined' ? undefined : relation?.type;
+  const relationId = relation?.friendshipId;
+  const relationLoading = relationId ? isFriendshipMutating(relationId) : false;
+  const relationActionDisabled = relationshipsLoading || relationLoading || isUserMutating(userId);
+
+  const confirmRemoveFriend = useCallback(() => {
+    if (!relation || relation.type !== 'friend') return;
+    Alert.alert(
+      `Remove ${displayName}?`,
+      'They will be removed from your friends list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => safeAction(() => removeFriend(relation.friendshipId)),
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [displayName, relation, removeFriend, safeAction]);
 
   const userPosts = useMemo(() => posts.filter(p => p.user_id === userId), [posts, userId]);
   const totalLikes = useMemo(
     () => userPosts.reduce((acc, post) => acc + (post.likes_count || 0), 0),
     [userPosts]
   );
+
+  useEffect(() => {
+    if (openCommentsPostId && !userPosts.some(post => post.id === openCommentsPostId)) {
+      setOpenCommentsPostId(null);
+    }
+  }, [openCommentsPostId, userPosts]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const match = userPosts[0]?.user;
@@ -97,6 +160,14 @@ export const UserProfileScreen: React.FC = () => {
       borderBottomWidth: 1,
       borderBottomColor: palette.border,
     },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerIconButton: {
+      padding: 6,
+    },
     title: { fontSize: 18, fontWeight: '700', color: palette.text },
     profileHeader: {
       backgroundColor: palette.card100,
@@ -134,6 +205,113 @@ export const UserProfileScreen: React.FC = () => {
     emptyText: { color: palette.subText, textAlign: 'center', marginTop: 8 },
   }), [palette]);
 
+  const friendActionNode = useMemo(() => {
+    if (isSelf || !userId) return null;
+    if (!relationType) {
+      if (relationActionDisabled) {
+        return (
+          <View style={styles.headerIconButton}>
+            <ActivityIndicator size="small" color={palette.primary} />
+          </View>
+        );
+      }
+      return (
+        <TouchableOpacity
+          onPress={() => safeAction(() => sendInvite(userId))}
+          style={styles.headerIconButton}
+        >
+          <Ionicons name="person-add-outline" size={22} color={palette.primary} />
+        </TouchableOpacity>
+      );
+    }
+
+    if (relationType === 'friend') {
+      return (
+        <TouchableOpacity
+          onPress={confirmRemoveFriend}
+          style={styles.headerIconButton}
+          disabled={relationActionDisabled}
+        >
+          {relationActionDisabled ? (
+            <ActivityIndicator size="small" color={palette.subText} />
+          ) : (
+            <Ionicons name="person-remove-outline" size={22} color="#e11d48" />
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    if (relationType === 'outgoing' && relationId) {
+      return (
+        <TouchableOpacity
+          onPress={() => safeAction(() => cancelInvite(relationId))}
+          style={styles.headerIconButton}
+          disabled={relationActionDisabled}
+        >
+          <Ionicons
+            name="close-circle-outline"
+            size={22}
+            color={relationActionDisabled ? palette.subText : palette.text}
+          />
+        </TouchableOpacity>
+      );
+    }
+
+    if (relationType === 'incoming' && relationId) {
+      return (
+        <>
+          <TouchableOpacity
+            onPress={() => safeAction(() => declineInvite(relationId))}
+            style={styles.headerIconButton}
+            disabled={relationActionDisabled}
+          >
+            <Ionicons
+              name="close-circle-outline"
+              size={22}
+              color={relationActionDisabled ? palette.subText : palette.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => safeAction(() => acceptInvite(relationId))}
+            style={styles.headerIconButton}
+            disabled={relationActionDisabled}
+          >
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={22}
+              color={relationActionDisabled ? palette.subText : palette.primary}
+            />
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    if (relationType === 'blocked') {
+      return (
+        <View style={styles.headerIconButton}>
+          <Ionicons name="lock-closed-outline" size={20} color={palette.subText} />
+        </View>
+      );
+    }
+
+    return null;
+  }, [
+    confirmRemoveFriend,
+    isSelf,
+    palette.primary,
+    palette.subText,
+    palette.text,
+    acceptInvite,
+    cancelInvite,
+    declineInvite,
+    relationActionDisabled,
+    relationId,
+    relationType,
+    safeAction,
+    sendInvite,
+    userId,
+  ]);
+
   const avatarUrl = profileData?.avatar_url || userPosts[0]?.user?.avatar_url || null;
   const avatarNode = avatarUrl ? (
     <Image
@@ -169,6 +347,7 @@ export const UserProfileScreen: React.FC = () => {
   const scrollToPost = useCallback((postId: string, options?: { delta?: number }) => {
     if (options?.delta != null && options.delta > 0) {
       const nextOffset = Math.max(0, scrollOffsetRef.current + options.delta);
+      scrollOffsetRef.current = nextOffset;
       flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: true });
       return;
     }
@@ -202,11 +381,14 @@ export const UserProfileScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={22} color={palette.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{displayName}</Text>
-        {!isSelf ? (
-          <TouchableOpacity onPress={openChat} style={{ padding: 6, marginLeft: 8 }}>
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color={palette.text} />
-          </TouchableOpacity>
-        ) : null}
+        <View style={styles.headerActions}>
+          {friendActionNode}
+          {!isSelf ? (
+            <TouchableOpacity onPress={openChat} style={styles.headerIconButton}>
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={palette.text} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {blocked ? (
@@ -254,6 +436,10 @@ export const UserProfileScreen: React.FC = () => {
           ref={flatListRef}
           data={userPosts}
           keyExtractor={item => item.id}
+          contentContainerStyle={{
+            paddingBottom:
+              openCommentsPostId && keyboardHeight ? keyboardHeight + 16 : 0,
+          }}
           refreshing={refreshing}
           onRefresh={refetch}
           keyboardShouldPersistTaps="handled"
@@ -292,6 +478,10 @@ export const UserProfileScreen: React.FC = () => {
               onCommentAdded={() => adjustCommentCount(item.id, 1)}
               onCommentFocus={scrollToPost}
               commentsLayout="compact"
+              commentsOpen={openCommentsPostId === item.id}
+              onCommentsToggle={(_postId, nextOpen) => {
+                setOpenCommentsPostId(nextOpen ? item.id : null);
+              }}
             />
           )}
           ListEmptyComponent={

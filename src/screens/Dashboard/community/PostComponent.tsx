@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -33,6 +34,8 @@ type PostComponentProps = {
   onCommentFocus?: (postId: string, options?: { delta?: number }) => void;
   commentsLayout?: 'compact' | 'expanded';
   allowCommentInput?: boolean;
+  commentsOpen?: boolean;
+  onCommentsToggle?: (postId: string, nextOpen: boolean) => void;
 };
 
 const InlineComments: React.FC<{
@@ -44,7 +47,8 @@ const InlineComments: React.FC<{
   updateInputBounds: () => void;
   layout: 'compact' | 'expanded';
   allowInput: boolean;
-}> = ({ postId, onCommentAdded, onCommentFocus, inputRef, inputFocusedRef, updateInputBounds, layout, allowInput }) => {
+  autoFocus?: boolean;
+}> = ({ postId, onCommentAdded, onCommentFocus, inputRef, inputFocusedRef, updateInputBounds, layout, allowInput, autoFocus }) => {
   const { palette } = useTheme();
   const { session } = useAuth();
   const { comments, loading, submitting, addComment } = useComments(postId);
@@ -55,6 +59,7 @@ const InlineComments: React.FC<{
   const scrollRef = useRef<ScrollView>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const keyboardHeightRef = useRef(0);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
@@ -63,6 +68,7 @@ const InlineComments: React.FC<{
 
   const requestScrollForInput = useCallback(() => {
     if (!allowInput) return;
+    if (!inputFocusedRef.current) return;
     if (!onCommentFocus || !inputRef.current) return;
     const keyboardHeight = keyboardHeightRef.current;
     if (!keyboardHeight) return;
@@ -80,12 +86,19 @@ const InlineComments: React.FC<{
       return;
     }
     const handleKeyboardShow = (event: any) => {
-      keyboardHeightRef.current = event?.endCoordinates?.height ?? 0;
+      const nextHeight = event?.endCoordinates?.height ?? 0;
+      keyboardHeightRef.current = nextHeight;
+      if (!inputFocusedRef.current) {
+        setKeyboardOffset(0);
+        return;
+      }
+      setKeyboardOffset(nextHeight);
       updateInputBounds();
       requestAnimationFrame(requestScrollForInput);
     };
     const handleKeyboardHide = () => {
       keyboardHeightRef.current = 0;
+      setKeyboardOffset(0);
       updateInputBounds();
     };
     const showSub = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
@@ -97,6 +110,14 @@ const InlineComments: React.FC<{
       cancelAnimationFrame(raf);
     };
   }, [allowInput, requestScrollForInput, updateInputBounds]);
+
+  React.useEffect(() => {
+    if (!autoFocus || !allowInput) return;
+    const timeout = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 80);
+    return () => clearTimeout(timeout);
+  }, [allowInput, autoFocus, inputRef]);
 
   const handleSend = useCallback(async () => {
     if (!text.trim()) return;
@@ -225,8 +246,12 @@ const InlineComments: React.FC<{
   );
 
   const containerStyle = useMemo(
-    () => [styles.container, shouldFixHeight && { height: containerHeight }],
-    [containerHeight, shouldFixHeight, styles.container]
+    () => [
+      styles.container,
+      shouldFixHeight && { height: containerHeight },
+      !isCompact && allowInput && keyboardOffset ? { paddingBottom: keyboardOffset } : null,
+    ],
+    [allowInput, containerHeight, isCompact, keyboardOffset, shouldFixHeight, styles.container]
   );
 
   const handleListScroll = useCallback((event: any) => {
@@ -367,8 +392,12 @@ const InlineComments: React.FC<{
             onFocus={() => {
               inputFocusedRef.current = true;
               setInputFocused(true);
+              if (keyboardHeightRef.current) {
+                setKeyboardOffset(keyboardHeightRef.current);
+              }
               requestAnimationFrame(updateInputBounds);
               requestAnimationFrame(requestScrollForInput);
+              setTimeout(requestScrollForInput, 120);
             }}
             onBlur={() => {
               inputFocusedRef.current = false;
@@ -417,14 +446,19 @@ export const PostComponent: React.FC<PostComponentProps> = ({
   onCommentFocus,
   commentsLayout = 'expanded',
   allowCommentInput = true,
+  commentsOpen,
+  onCommentsToggle,
 }) => {
   const { palette } = useTheme();
   const commentCount = post.commentsCount ?? post.comments?.length ?? 0;
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [internalCommentsOpen, setInternalCommentsOpen] = useState(false);
+  const [autoFocusInput, setAutoFocusInput] = useState(false);
   const forceOpenRef = useRef(false);
   const commentInputRef = useRef<TextInput>(null);
   const commentInputFocusedRef = useRef(false);
   const commentInputBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const isCommentsControlled = typeof commentsOpen === 'boolean';
+  const resolvedCommentsOpen = isCommentsControlled ? commentsOpen : internalCommentsOpen;
 
   const updateCommentInputBounds = useCallback(() => {
     if (!commentInputRef.current) return;
@@ -439,7 +473,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({
   }, []);
 
   const handleRootTouchStart = useCallback((event: any) => {
-    if (!commentsOpen) {
+    if (!resolvedCommentsOpen) {
       return;
     }
     const { pageX, pageY, target } = event.nativeEvent;
@@ -460,7 +494,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({
       return;
     }
     dismissInlineKeyboard();
-  }, [commentsOpen, dismissInlineKeyboard]);
+  }, [dismissInlineKeyboard, resolvedCommentsOpen]);
 
   const handleRootStartCapture = useCallback((event: any) => {
     handleRootTouchStart(event);
@@ -469,33 +503,64 @@ export const PostComponent: React.FC<PostComponentProps> = ({
 
   React.useEffect(() => {
     if (forceCommentsOpen && !forceOpenRef.current) {
-      setCommentsOpen(true);
+      if (isCommentsControlled) {
+        onCommentsToggle?.(post.id, true);
+      } else {
+        setInternalCommentsOpen(true);
+      }
+      setAutoFocusInput(false);
       forceOpenRef.current = true;
       return;
     }
     if (!forceCommentsOpen) {
       forceOpenRef.current = false;
     }
-  }, [forceCommentsOpen]);
+  }, [forceCommentsOpen, isCommentsControlled, onCommentsToggle, post.id]);
 
   React.useEffect(() => {
-    if (commentsOpen) {
+    if (resolvedCommentsOpen) {
       const raf = requestAnimationFrame(updateCommentInputBounds);
       return () => cancelAnimationFrame(raf);
     }
-  }, [commentsOpen, updateCommentInputBounds]);
+  }, [resolvedCommentsOpen, updateCommentInputBounds]);
+
+  React.useEffect(() => {
+    if (resolvedCommentsOpen && autoFocusInput) {
+      const timeout = setTimeout(() => setAutoFocusInput(false), 0);
+      return () => clearTimeout(timeout);
+    }
+  }, [autoFocusInput, resolvedCommentsOpen]);
 
   const handleCommentPress = useCallback(() => {
-    Keyboard.dismiss();
+    const next = !resolvedCommentsOpen;
+    if (!next || !allowCommentInput) {
+      Keyboard.dismiss();
+    }
     onComment?.(post.id);
-    setCommentsOpen((prev) => {
-      const next = !prev;
-      if (next && commentsLayout === 'expanded') {
-        onCommentFocus?.(post.id);
+    if (next) {
+      setAutoFocusInput(Boolean(allowCommentInput));
+      if (commentsLayout === 'expanded') {
+        requestAnimationFrame(() => {
+          onCommentFocus?.(post.id);
+        });
       }
-      return next;
-    });
-  }, [commentsLayout, onComment, onCommentFocus, post.id]);
+    }
+    if (isCommentsControlled) {
+      onCommentsToggle?.(post.id, next);
+    } else {
+      setInternalCommentsOpen(next);
+    }
+  }, [allowCommentInput, commentsLayout, isCommentsControlled, onComment, onCommentFocus, onCommentsToggle, post.id, resolvedCommentsOpen]);
+
+  const handleShare = useCallback(async () => {
+    const messageParts = [post.content?.trim(), post.image].filter(Boolean) as string[];
+    const message = messageParts.join('\n\n') || 'Check out this post';
+    try {
+      await Share.share({ message });
+    } catch (error) {
+      console.warn('Share failed', error);
+    }
+  }, [post.content, post.image]);
 
   const formatTimestamp = (timestamp: string) => {
     const now = new Date();
@@ -763,10 +828,10 @@ export const PostComponent: React.FC<PostComponentProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.actionButton, commentsOpen && styles.actionButtonActive]}
+          style={[styles.actionButton, resolvedCommentsOpen && styles.actionButtonActive]}
           onPress={handleCommentPress}
         >
-          <Ionicons name={commentsOpen ? "chatbubble" : "chatbubble-outline"} size={20} color={palette.text} />
+          <Ionicons name={resolvedCommentsOpen ? "chatbubble" : "chatbubble-outline"} size={20} color={palette.text} />
           <Text style={[styles.actionText, { color: palette.text }]}>
             {commentCount}
           </Text>
@@ -790,6 +855,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({
             style={styles.actionButton}
             onPress={() => {
               Keyboard.dismiss();
+              handleShare();
             }}
           >
             <Ionicons name="share-outline" size={22} color={palette.text} />
@@ -800,7 +866,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({
         )}
       </View>
 
-      {commentsOpen && (
+      {resolvedCommentsOpen && (
         <InlineComments
           postId={post.id}
           onCommentAdded={onCommentAdded}
@@ -810,6 +876,7 @@ export const PostComponent: React.FC<PostComponentProps> = ({
           updateInputBounds={updateCommentInputBounds}
           layout={commentsLayout}
           allowInput={allowCommentInput}
+          autoFocus={autoFocusInput}
         />
       )}
     </View>

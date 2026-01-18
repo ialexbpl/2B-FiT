@@ -35,7 +35,11 @@ const resolveName = (profile: { full_name: string | null; username: string | nul
 const resolveUsername = (profile: { username: string | null }) =>
   profile.username ? `@${profile.username}` : '';
 
-export const FriendsPanel: React.FC = () => {
+type FriendsPanelContentProps = {
+  friendsState: ReturnType<typeof useFriends>;
+};
+
+export const FriendsPanelContent: React.FC<FriendsPanelContentProps> = ({ friendsState }) => {
   const { palette } = useTheme();
   const navigation = useNavigation<any>();
   const styles = React.useMemo(() => makeProfileStyles(palette), [palette]);
@@ -58,7 +62,7 @@ export const FriendsPanel: React.FC = () => {
     isUserMutating,
     isFriendshipMutating,
     refresh,
-  } = useFriends();
+  } = friendsState;
 
   const [friendsModalVisible, setFriendsModalVisible] = useState(false);
   const [finderModalVisible, setFinderModalVisible] = useState(false);
@@ -502,4 +506,9 @@ export const FriendsPanel: React.FC = () => {
       </Modal>
     </>
   );
+};
+
+export const FriendsPanel: React.FC = () => {
+  const friendsState = useFriends();
+  return <FriendsPanelContent friendsState={friendsState} />;
 };
