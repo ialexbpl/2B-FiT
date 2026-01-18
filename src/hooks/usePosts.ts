@@ -35,6 +35,10 @@ export const usePosts = () => {
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
 
+  const likeDesiredRef = useRef<Record<string, boolean | null>>({});
+  const likeInFlightRef = useRef<Record<string, boolean>>({});
+
+
   const lastFetchRef = useRef<number>(0);
   const cacheRef = useRef<Post[]>([]);
 
@@ -208,16 +212,54 @@ export const usePosts = () => {
   };
 
   const likePost = async (postId: string) => {
-    if (!session?.user?.id) {
-      console.log('Cannot like post - no user session');
-      return;
-    }
+  if (!session?.user?.id) {
+    console.log('Cannot like post - no user session');
+    return;
+  }
 
-    try {
-      const post = posts.find(p => p.id === postId);
-      const isCurrentlyLiked = post?.is_liked;
+  let nextLiked = false;
 
-      if (isCurrentlyLiked) {
+  setPosts(prev =>
+    prev.map(p => {
+      if (p.id !== postId) return p;
+
+      nextLiked = !p.is_liked;
+      const nextCount = Math.max((p.likes_count || 0) + (nextLiked ? 1 : -1), 0);
+
+      return { ...p, is_liked: nextLiked, likes_count: nextCount };
+    })
+  );
+
+  cacheRef.current = cacheRef.current.map(p => {
+    if (p.id !== postId) return p;
+    const liked = !p.is_liked;
+    return {
+      ...p,
+      is_liked: liked,
+      likes_count: Math.max((p.likes_count || 0) + (liked ? 1 : -1), 0),
+    };
+  });
+
+  likeDesiredRef.current[postId] = nextLiked;
+
+  if (likeInFlightRef.current[postId]) return;
+
+  likeInFlightRef.current[postId] = true;
+
+  try {
+    while (likeDesiredRef.current[postId] !== null && likeDesiredRef.current[postId] !== undefined) {
+      const desired = likeDesiredRef.current[postId] as boolean;
+      likeDesiredRef.current[postId] = null;
+
+      if (desired) {
+        const { error } = await supabase
+          .from('post_likes')
+          .upsert([{ post_id: postId, user_id: session.user.id }], {
+            onConflict: 'post_id,user_id',
+          });
+
+        if (error) throw error;
+      } else {
         const { error } = await supabase
           .from('post_likes')
           .delete()
@@ -225,29 +267,17 @@ export const usePosts = () => {
           .eq('user_id', session.user.id);
 
         if (error) throw error;
-
-        setPosts(prev =>
-          prev.map(p =>
-            p.id === postId ? { ...p, is_liked: false, likes_count: p.likes_count - 1 } : p
-          )
-        );
-      } else {
-        const { error } = await supabase
-          .from('post_likes')
-          .insert([{ post_id: postId, user_id: session.user.id }]);
-
-        if (error) throw error;
-
-        setPosts(prev =>
-          prev.map(p =>
-            p.id === postId ? { ...p, is_liked: true, likes_count: p.likes_count + 1 } : p
-          )
-        );
       }
-    } catch (error) {
-      console.error('Error toggling like:', error);
     }
-  };
+  } catch (error) {
+    console.error('Error toggling like:', error);
+
+    fetchPosts(true);
+  } finally {
+    likeInFlightRef.current[postId] = false;
+  }
+};
+
 
   const deletePost = async (postId: string) => {
     if (!session?.user?.id) {

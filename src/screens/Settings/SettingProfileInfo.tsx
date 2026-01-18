@@ -18,7 +18,7 @@ import {
   modalPlaceholders,
   modalTitles,
   modalDescriptions,
-  SEX_OPTIONS
+  SEX_OPTIONS,
 } from '../../models/ProfileModel';
 import { useProfile } from '../../context/ProfileContext';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -27,6 +27,35 @@ type SettingProfileInfoProps = ProfileInformationsProps & {
   layout?: 'default' | 'inline';
   initialModal?: ModalType | null;
   onInitialModalHandled?: () => void;
+};
+
+const NUMERIC_LIMITS = {
+  age: { min: 13, max: 100, label: 'Age', unit: 'years' },
+  height: { min: 100, max: 250, label: 'Height', unit: 'cm' },
+  weight: { min: 30, max: 300, label: 'Weight', unit: 'kg' },
+  goal: { min: 30, max: 300, label: 'Target weight', unit: 'kg' },
+} as const;
+
+const getNumericError = (
+  key: keyof typeof NUMERIC_LIMITS,
+  raw: string,
+): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return 'This field is required.';
+
+  const n =
+    key === 'weight' || key === 'goal'
+      ? parseFloat(trimmed)
+      : parseInt(trimmed, 10);
+
+  if (Number.isNaN(n)) return 'Please enter a valid number.';
+
+  const { min, max, label, unit } = NUMERIC_LIMITS[key];
+  if (n < min || n > max) {
+    return `${label} must be between ${min} and ${max}${unit ? ` ${unit}` : ''}.`;
+  }
+
+  return null;
 };
 
 export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
@@ -62,13 +91,15 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   const [draftSex, setDraftSex] = useState<typeof SEX_OPTIONS[number]>(sex);
   const [draftPrivacy, setDraftPrivacy] = useState<boolean>(isPrivate);
 
+  const [modalError, setModalError] = useState<string | null>(null);
+
   const neutralBorder = palette.border;
   const neutralBackground = palette.card;
   const modalTextColor = palette.text;
 
   const selectedActivity = useMemo(
     () => (activityLevel ? activityLevel : 'Select level'),
-    [activityLevel]
+    [activityLevel],
   );
 
   const editCards = useMemo(
@@ -141,60 +172,76 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     [sex, age, height, weight, goalWeight, selectedActivity, allergies, isPrivate],
   );
 
-  const openModal = useCallback((type: ModalType) => {
-    if (!type) {
-      return;
-    }
+  const openModal = useCallback(
+    (type: ModalType) => {
+      if (!type) return;
 
-    switch (type) {
-      case 'age':
-        setDraftTextValue(age);
-        break;
-      case 'height':
-        setDraftTextValue(height);
-        break;
-      case 'weight':
-        setDraftTextValue(weight);
-        break;
-      case 'goal':
-        setDraftTextValue(goalWeight);
-        break;
-      case 'sex':
-        setDraftSex(sex);
-        break;
-      case 'activity':
-        setDraftActivity(activityLevel ?? ACTIVITY_LEVELS[0]);
-        break;
-      case 'allergies':
-        setDraftAllergies(allergies);
-        break;
-      case 'privacy':
-        setDraftPrivacy(isPrivate);
-        break;
-    }
+      setModalError(null);
 
-    setActiveModal(type);
-  }, [activityLevel, age, allergies, goalWeight, height, sex, weight, isPrivate]);
+      switch (type) {
+        case 'age':
+          setDraftTextValue(age ?? '');
+          break;
+        case 'height':
+          setDraftTextValue(height ?? '');
+          break;
+        case 'weight':
+          setDraftTextValue(weight ?? '');
+          break;
+        case 'goal':
+          setDraftTextValue(goalWeight ?? '');
+          break;
+        case 'sex':
+          setDraftSex(sex);
+          break;
+        case 'activity':
+          setDraftActivity(activityLevel ?? ACTIVITY_LEVELS[0]);
+          break;
+        case 'allergies':
+          setDraftAllergies(allergies);
+          break;
+        case 'privacy':
+          setDraftPrivacy(isPrivate);
+          break;
+      }
 
-  const handleNumericChange = (value: string, maxLength: number) => {
-    const numericValue = value.replace(/[^0-9]/g, '').slice(0, maxLength);
-    setDraftTextValue(numericValue);
-  };
+      setActiveModal(type);
+    },
+    [activityLevel, age, allergies, goalWeight, height, sex, weight, isPrivate],
+  );
+
+  const handleNumericChange = useCallback(
+    (value: string, maxLength: number) => {
+      setModalError(null);
+
+      if (activeModal === 'weight' || activeModal === 'goal') {
+        const cleaned = value
+          .replace(/[^0-9.]/g, '')
+          .replace(/(\..*)\./g, '$1')
+          .slice(0, maxLength);
+        setDraftTextValue(cleaned);
+        return;
+      }
+
+      const numericValue = value.replace(/[^0-9]/g, '').slice(0, maxLength);
+      setDraftTextValue(numericValue);
+    },
+    [activeModal],
+  );
 
   const toggleAllergy = (option: string) => {
     setDraftAllergies(prev =>
-      prev.includes(option) ? prev.filter(item => item !== option) : [...prev, option]
+      prev.includes(option) ? prev.filter(item => item !== option) : [...prev, option],
     );
   };
 
   const handleModalCancel = () => {
     setActiveModal(null);
+    setModalError(null);
   };
 
   const handleModalSave = () => {
-    if (!activeModal) {
-      return;
-    }
+    if (!activeModal) return;
 
     if (activeModal === 'sex') {
       setSex(draftSex);
@@ -203,9 +250,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     }
 
     if (activeModal === 'activity') {
-      if (draftActivity) {
-        setActivityLevel(draftActivity);
-      }
+      if (draftActivity) setActivityLevel(draftActivity);
       setActiveModal(null);
       return;
     }
@@ -215,6 +260,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
       setActiveModal(null);
       return;
     }
+
     if (activeModal === 'privacy') {
       setIsPrivate(draftPrivacy);
       setActiveModal(null);
@@ -222,27 +268,55 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
     }
 
     const normalized = draftTextValue.trim();
-    if (!normalized) {
+
+    if (
+      activeModal === 'age' ||
+      activeModal === 'height' ||
+      activeModal === 'weight' ||
+      activeModal === 'goal'
+    ) {
+      const keyMap: Record<
+        'age' | 'height' | 'weight' | 'goal',
+        keyof typeof NUMERIC_LIMITS
+      > = {
+        age: 'age',
+        height: 'height',
+        weight: 'weight',
+        goal: 'goal',
+      };
+
+      const limitKey = keyMap[activeModal];
+      const error = getNumericError(limitKey, normalized);
+
+      if (error) {
+        setModalError(error);
+        return;
+      }
+
+      const toSave = normalized;
+
+      switch (activeModal) {
+        case 'age':
+          setAge(toSave);
+          break;
+        case 'height':
+          setHeight(toSave);
+          break;
+        case 'weight':
+          setWeight(toSave);
+          break;
+        case 'goal':
+          setGoalWeight(toSave);
+          break;
+      }
+
       setActiveModal(null);
+      setModalError(null);
       return;
     }
 
-    switch (activeModal) {
-      case 'age':
-        setAge(normalized);
-        break;
-      case 'height':
-        setHeight(normalized);
-        break;
-      case 'weight':
-        setWeight(normalized);
-        break;
-      case 'goal':
-        setGoalWeight(normalized);
-        break;
-    }
-
     setActiveModal(null);
+    setModalError(null);
   };
 
   useEffect(() => {
@@ -253,9 +327,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
   }, [initialModal, onInitialModalHandled, openModal]);
 
   const renderModalBody = () => {
-    if (!activeModal) {
-      return null;
-    }
+    if (!activeModal) return null;
 
     if (activeModal === 'privacy') {
       return (
@@ -264,7 +336,10 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
             <Text style={[styles.optionButtonText, { color: modalTextColor }]}>Private profile</Text>
             <Switch
               value={draftPrivacy}
-              onValueChange={setDraftPrivacy}
+              onValueChange={(v) => {
+                setModalError(null);
+                setDraftPrivacy(v);
+              }}
               thumbColor={draftPrivacy ? palette.primary : palette.card100}
               trackColor={{ false: palette.border, true: `${palette.primary}66` }}
             />
@@ -284,17 +359,20 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
             return (
               <TouchableOpacity
                 key={option}
-                onPress={() => setDraftSex(option)}
+                onPress={() => {
+                  setModalError(null);
+                  setDraftSex(option);
+                }}
                 style={[
                   styles.optionButton,
                   { borderColor: neutralBorder, backgroundColor: neutralBackground },
-                  isSelected && styles.optionButtonSelected
+                  isSelected && styles.optionButtonSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.optionButtonText,
-                    { color: isSelected ? '#ffffff' : modalTextColor }
+                    { color: isSelected ? '#ffffff' : modalTextColor },
                   ]}
                 >
                   {option}
@@ -314,17 +392,20 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
             return (
               <TouchableOpacity
                 key={level}
-                onPress={() => setDraftActivity(level)}
+                onPress={() => {
+                  setModalError(null);
+                  setDraftActivity(level);
+                }}
                 style={[
                   styles.optionButton,
                   { borderColor: neutralBorder, backgroundColor: neutralBackground },
-                  isSelected && styles.optionButtonSelected
+                  isSelected && styles.optionButtonSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.optionButtonText,
-                    { color: isSelected ? '#ffffff' : modalTextColor }
+                    { color: isSelected ? '#ffffff' : modalTextColor },
                   ]}
                 >
                   {level}
@@ -350,17 +431,20 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
             return (
               <TouchableOpacity
                 key={option}
-                onPress={() => toggleAllergy(option)}
+                onPress={() => {
+                  setModalError(null);
+                  toggleAllergy(option);
+                }}
                 style={[
                   styles.optionChip,
                   { borderColor: neutralBorder, backgroundColor: neutralBackground },
-                  isSelected && styles.optionChipSelected
+                  isSelected && styles.optionChipSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.optionChipText,
-                    { color: isSelected ? '#ffffff' : modalTextColor }
+                    { color: isSelected ? '#ffffff' : modalTextColor },
                   ]}
                 >
                   {option}
@@ -369,33 +453,47 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
             );
           })}
           <TouchableOpacity
-            onPress={() => setDraftAllergies([])}
+            onPress={() => {
+              setModalError(null);
+              setDraftAllergies([]);
+            }}
             style={[
               styles.optionChip,
-              { borderColor: neutralBorder, backgroundColor: neutralBackground }
+              { borderColor: neutralBorder, backgroundColor: neutralBackground },
             ]}
           >
-            <Text style={[styles.optionChipText, { color: modalTextColor }]}>
-              No allergies
-            </Text>
+            <Text style={[styles.optionChipText, { color: modalTextColor }]}>No allergies</Text>
           </TouchableOpacity>
         </ScrollView>
       );
     }
 
     const key = activeModal as 'age' | 'height' | 'weight' | 'goal';
+    const isDecimal = key === 'weight' || key === 'goal';
+
     return (
-      <TextInput
-        value={draftTextValue}
-        onChangeText={value => handleNumericChange(value, numericMaxLength[key])}
-        keyboardType="number-pad"
-        placeholder={modalPlaceholders[key]}
-        style={[
-          styles.modalInput,
-          { borderColor: neutralBorder, color: modalTextColor }
-        ]}
-        placeholderTextColor={palette.subText}
-      />
+      <View>
+        <TextInput
+          value={draftTextValue}
+          onChangeText={value => handleNumericChange(value, numericMaxLength[key])}
+          keyboardType={isDecimal ? 'decimal-pad' : 'number-pad'}
+          placeholder={modalPlaceholders[key]}
+          style={[
+            styles.modalInput,
+            {
+              borderColor: modalError ? '#ff4d4f' : neutralBorder,
+              color: modalTextColor,
+            },
+          ]}
+          placeholderTextColor={palette.subText}
+        />
+
+        {!!modalError && (
+          <Text style={{ marginTop: 8, color: '#ff4d4f', fontSize: 12 }}>
+            {modalError}
+          </Text>
+        )}
+      </View>
     );
   };
 
@@ -429,7 +527,9 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
               >
                 {card.value}
               </Text>
-              <Text style={[styles.settingsHelper, { color: palette.subText }]}>{card.helper}</Text>
+              <Text style={[styles.settingsHelper, { color: palette.subText }]}>
+                {card.helper}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -445,7 +545,7 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: palette.card100, borderColor: neutralBorder }
+              { backgroundColor: palette.card100, borderColor: neutralBorder },
             ]}
           >
             {activeModal && (
@@ -456,19 +556,22 @@ export const SettingProfileInfo: React.FC<SettingProfileInfoProps> = ({
                 <Text style={styles.modalSubtitle}>
                   {modalDescriptions[activeModal]}
                 </Text>
+
                 {renderModalBody()}
+
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     onPress={handleModalCancel}
                     style={[
                       styles.modalButton,
-                      { borderColor: neutralBorder, backgroundColor: neutralBackground }
+                      { borderColor: neutralBorder, backgroundColor: neutralBackground },
                     ]}
                   >
                     <Text style={[styles.modalButtonText, { color: modalTextColor }]}>
                       Cancel
                     </Text>
                   </TouchableOpacity>
+
                   <TouchableOpacity
                     onPress={handleModalSave}
                     style={[styles.modalButton, styles.modalPrimaryButton]}
