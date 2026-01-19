@@ -60,6 +60,7 @@ export const SurveyScreen: React.FC<SurveyProps> = ({ onCompleted }) => {
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [switchingAccount, setSwitchingAccount] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const toggleAllergy = useCallback(
@@ -202,6 +203,19 @@ export const SurveyScreen: React.FC<SurveyProps> = ({ onCompleted }) => {
     activityLevel,
     allergies,
   ]);
+
+  const handleSwitchAccount = useCallback(async () => {
+    setApiError(null);
+    setSwitchingAccount(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setApiError('Unable to sign out. Please try again.');
+      }
+    } finally {
+      setSwitchingAccount(false);
+    }
+  }, []);
 
   return (
     <View style={[styles.safeArea, { backgroundColor: palette.background }]}>
@@ -449,6 +463,20 @@ export const SurveyScreen: React.FC<SurveyProps> = ({ onCompleted }) => {
               ) : (
                 <Text style={[styles.submitText, { color: palette.onPrimary }]}>
                   Continue
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={handleSwitchAccount}
+              disabled={submitting || switchingAccount}
+              style={styles.switchAccountButton}
+            >
+              {switchingAccount ? (
+                <ActivityIndicator color={palette.subText} />
+              ) : (
+                <Text style={[styles.switchAccountText, { color: palette.subText }]}>
+                  Use a different account
                 </Text>
               )}
             </Pressable>

@@ -66,4 +66,13 @@ export const surveyStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  switchAccountButton: {
+    marginTop: theme.spacing(2),
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchAccountText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });

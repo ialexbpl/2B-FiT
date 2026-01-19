@@ -26,115 +26,169 @@ export type Post = {
   is_liked: boolean;
 };
 
+type PostsListener = (posts: Post[]) => void;
+
+const postsStore = {
+  posts: [] as Post[],
+  cache: [] as Post[],
+  lastFetch: 0,
+  listeners: new Set<PostsListener>(),
+};
+
+const notifyPosts = () => {
+  postsStore.listeners.forEach(listener => listener(postsStore.posts));
+};
+
+const setStorePosts = (posts: Post[]) => {
+  postsStore.posts = posts;
+  postsStore.cache = posts;
+  notifyPosts();
+};
+
+const updateStorePosts = (updater: (posts: Post[]) => Post[]) => {
+  setStorePosts(updater(postsStore.posts));
+};
+
+let globalFetchPromise: Promise<void> | null = null;
+
 export const usePosts = () => {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Post[]>(postsStore.posts);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { session } = useAuth();
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isFetchingRef = useRef(false);
+  const previousUserIdRef = useRef<string | null>(null);
 
   const likeDesiredRef = useRef<Record<string, boolean | null>>({});
   const likeInFlightRef = useRef<Record<string, boolean>>({});
 
+  useEffect(() => {
+    const listener = (nextPosts: Post[]) => {
+      setPosts(nextPosts);
+      setLoading(false);
+      setRefreshing(false);
+    };
+    postsStore.listeners.add(listener);
+    if (postsStore.posts.length) {
+      setPosts(postsStore.posts);
+      setLoading(false);
+    }
+    return () => {
+      postsStore.listeners.delete(listener);
+    };
+  }, []);
 
-  const lastFetchRef = useRef<number>(0);
-  const cacheRef = useRef<Post[]>([]);
+  useEffect(() => {
+    const currentUserId = session?.user?.id ?? null;
+    if (previousUserIdRef.current && previousUserIdRef.current !== currentUserId) {
+      postsStore.lastFetch = 0;
+      setStorePosts([]);
+      setLoading(true);
+    }
+    previousUserIdRef.current = currentUserId;
+  }, [session?.user?.id]);
 
   const fetchPosts = useCallback(async (force = false) => {
     const now = Date.now();
-    if (!force && now - lastFetchRef.current < 4000) {
-      if (cacheRef.current.length) {
-        setPosts(cacheRef.current);
+    if (!force && now - postsStore.lastFetch < 4000) {
+      if (postsStore.cache.length) {
+        setStorePosts(postsStore.cache);
         setLoading(false);
         setRefreshing(false);
       }
       return;
     }
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-    lastFetchRef.current = now;
-    try {
-      console.log('Fetching posts...');
-      setErrorMessage(null);
-
-      if (!session?.user?.id) {
-        setPosts([]);
-        setLoading(false);
-        return;
-      }
-
-      const [postsRes, likedRes] = await Promise.all([
-        supabase
-          .from('posts')
-          .select(`
-            *,
-            user:profiles!user_id (
-              id,
-              username,
-              full_name,
-              avatar_url
-            )
-          `)
-          .order('created_at', { ascending: false }),
-        supabase.from('post_likes').select('post_id').eq('user_id', session.user.id),
-      ]);
-
-      if (postsRes.error) throw postsRes.error;
-      if (likedRes.error) throw likedRes.error;
-
-      const likedSet = new Set((likedRes.data || []).map((like: any) => like.post_id));
-      const postsRaw = postsRes.data || [];
-      const userIds = Array.from(new Set(postsRaw.map((p: any) => p.user_id)));
-
-      // fetch privacy flags separately (no FK relationship required)
-      let privacyMap: Record<string, boolean> = {};
+    if (globalFetchPromise) {
+      await globalFetchPromise;
+      return;
+    }
+    globalFetchPromise = (async () => {
+      postsStore.lastFetch = now;
       try {
-        if (userIds.length) {
-          const { data: privacyRows } = await supabase
-            .from('profile_settings')
-            .select('id, is_private')
-            .in('id', userIds);
-          if (Array.isArray(privacyRows)) {
-            privacyMap = Object.fromEntries(
-              privacyRows.map((row: any) => [row.id, Boolean(row.is_private)])
-            );
-          }
+        console.log('Fetching posts...');
+        setErrorMessage(null);
+
+        if (!session?.user?.id) {
+          setStorePosts([]);
+          setLoading(false);
+          return;
         }
-      } catch {
-        // leave map empty; downstream defaults will hide others' posts
+
+        const [postsRes, likedRes] = await Promise.all([
+          supabase
+            .from('posts')
+            .select(`
+              *,
+              user:profiles!user_id (
+                id,
+                username,
+                full_name,
+                avatar_url
+              )
+            `)
+            .order('created_at', { ascending: false }),
+          supabase.from('post_likes').select('post_id').eq('user_id', session.user.id),
+        ]);
+
+        if (postsRes.error) throw postsRes.error;
+        if (likedRes.error) throw likedRes.error;
+
+        const likedSet = new Set((likedRes.data || []).map((like: any) => like.post_id));
+        const postsRaw = postsRes.data || [];
+        const userIds = Array.from(new Set(postsRaw.map((p: any) => p.user_id)));
+
+        // fetch privacy flags separately (no FK relationship required)
+        let privacyMap: Record<string, boolean> = {};
+        try {
+          if (userIds.length) {
+            const { data: privacyRows } = await supabase
+              .from('profile_settings')
+              .select('id, is_private')
+              .in('id', userIds);
+            if (Array.isArray(privacyRows)) {
+              privacyMap = Object.fromEntries(
+                privacyRows.map((row: any) => [row.id, Boolean(row.is_private)])
+              );
+            }
+          }
+        } catch {
+          // leave map empty; downstream defaults will hide others' posts
+        }
+
+        const currentUserId = session?.user?.id;
+        const postsWithFlags = postsRaw.map(post => {
+          const privacyFlag = privacyMap[post.user_id];
+          const isPrivate =
+            typeof privacyFlag === 'boolean'
+              ? privacyFlag
+              : post.user_id !== currentUserId; // default: hide others if privacy unknown
+          return {
+            ...post,
+            is_private: isPrivate,
+            is_liked: likedSet.has(post.id),
+          };
+        });
+
+        const postsWithLikes = postsWithFlags.filter(
+          p => !p.is_private || p.user_id === currentUserId
+        );
+
+        console.log(`Loaded ${postsWithLikes.length} posts`);
+        setStorePosts(postsWithLikes);
+      } catch (error) {
+        console.warn('Error fetching posts:', error);
+        setErrorMessage('Network request failed. Check your connection and Supabase URL.');
+        setStorePosts([]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      const currentUserId = session?.user?.id;
-      const postsWithFlags = postsRaw.map(post => {
-        const privacyFlag = privacyMap[post.user_id];
-        const isPrivate =
-          typeof privacyFlag === 'boolean'
-            ? privacyFlag
-            : post.user_id !== currentUserId; // default: hide others if privacy unknown
-        return {
-          ...post,
-          is_private: isPrivate,
-          is_liked: likedSet.has(post.id),
-        };
-      });
-
-      const postsWithLikes = postsWithFlags.filter(
-        p => !p.is_private || p.user_id === currentUserId
-      );
-
-      console.log(`Loaded ${postsWithLikes.length} posts`);
-      cacheRef.current = postsWithLikes;
-      setPosts(postsWithLikes);
-    } catch (error) {
-      console.warn('Error fetching posts:', error);
-      setErrorMessage('Network request failed. Check your connection and Supabase URL.');
-      setPosts([]);
+    })();
+    try {
+      await globalFetchPromise;
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-      isFetchingRef.current = false;
+      globalFetchPromise = null;
     }
   }, [session?.user?.id]);
 
@@ -195,7 +249,7 @@ export const usePosts = () => {
         },
       };
 
-      setPosts(prev => [
+      updateStorePosts(prev => [
         {
           ...postToAdd,
           is_private: postToAdd.is_private ?? false,
@@ -219,10 +273,12 @@ export const usePosts = () => {
 
   let nextLiked = false;
 
-  setPosts(prev =>
+  let found = false;
+  updateStorePosts(prev =>
     prev.map(p => {
       if (p.id !== postId) return p;
 
+      found = true;
       nextLiked = !p.is_liked;
       const nextCount = Math.max((p.likes_count || 0) + (nextLiked ? 1 : -1), 0);
 
@@ -230,15 +286,7 @@ export const usePosts = () => {
     })
   );
 
-  cacheRef.current = cacheRef.current.map(p => {
-    if (p.id !== postId) return p;
-    const liked = !p.is_liked;
-    return {
-      ...p,
-      is_liked: liked,
-      likes_count: Math.max((p.likes_count || 0) + (liked ? 1 : -1), 0),
-    };
-  });
+  if (!found) return;
 
   likeDesiredRef.current[postId] = nextLiked;
 
@@ -294,7 +342,7 @@ export const usePosts = () => {
 
       if (error) throw error;
 
-      setPosts(prev => prev.filter(p => p.id !== postId));
+      updateStorePosts(prev => prev.filter(p => p.id !== postId));
     } catch (error) {
       console.error('Error deleting post:', error);
       throw error;
@@ -308,7 +356,7 @@ export const usePosts = () => {
   }, [fetchPosts]);
 
   const adjustCommentCount = (postId: string, delta: number) => {
-    setPosts(prev =>
+    updateStorePosts(prev =>
       prev.map(p =>
         p.id === postId
           ? { ...p, comments_count: Math.max((p.comments_count || 0) + delta, 0) }

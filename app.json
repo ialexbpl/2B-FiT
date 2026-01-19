@@ -18,7 +18,10 @@
       "bundleIdentifier": "com.tofitlabs.mobile"
     },
     "android": {
-      "package": "com.axel2004b.x2bfit"
+      "package": "com.axel2004b.x2bfit",
+      "permissions": [
+        "ACTIVITY_RECOGNITION"
+      ]
     },
     "web": {
       "bundler": "metro",
