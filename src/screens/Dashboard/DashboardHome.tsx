@@ -22,18 +22,13 @@ import { WeightCard } from './WeightCard';
 import { SleepChart } from './SleepChart';
 import { FoodIntake } from './FoodIntake';
 import { WaterIntakeCard } from './WaterIntakeCard';
+import { FindGym } from './FindGym';
 
-import { fetchGyms } from '../../api/gymService';
-import { Gym } from '../../models/GymModels';
-import { GymListItem } from './GymListItem';
-import { GymDetailsScreen } from './GymDetailsScreen';
 import { searchUsers, type UserSearchResult } from '../../api/userService';
 
-type ActiveView = { type: 'WIDGETS_OR_LIST' } | { type: 'DETAILS'; gymId: string };
-
-type SearchSection =
-  | { title: 'Users'; key: 'users'; data: UserSearchResult[] }
-  | { title: 'Gyms'; key: 'gyms'; data: Gym[] };
+type ActiveView = 
+  | { type: 'WIDGETS_OR_LIST' } 
+  | { type: 'FIND_GYM' };
 
 const localStyles = StyleSheet.create({
   loadingText: { textAlign: 'center', marginTop: 30, fontSize: 16 },
@@ -70,26 +65,8 @@ export const DashboardHome: React.FC = () => {
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'WIDGETS_OR_LIST' });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [gyms, setGyms] = useState<Gym[]>([]);
   const [users, setUsers] = useState<UserSearchResult[]>([]);
-  const [gymLoading, setGymLoading] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
-
-  const loadGyms = useCallback(async (query: string) => {
-    if (query.trim() === '') {
-      setGyms([]);
-      return;
-    }
-    setGymLoading(true);
-    try {
-      const result = await fetchGyms(query);
-      setGyms(result);
-    } catch (error) {
-      console.error('Error while loading gyms:', error);
-    } finally {
-      setGymLoading(false);
-    }
-  }, []);
 
   const loadUsers = useCallback(
     async (query: string) => {
@@ -114,17 +91,11 @@ export const DashboardHome: React.FC = () => {
   useEffect(() => {
     const normalized = searchQuery.trim();
     if (normalized.length === 0) {
-      setGyms([]);
       setUsers([]);
       return;
     }
-    loadGyms(normalized);
     loadUsers(normalized);
-  }, [searchQuery, loadGyms, loadUsers]);
-
-  const handleGymPress = (gym: Gym) => {
-    setActiveView({ type: 'DETAILS', gymId: gym.id });
-  };
+  }, [searchQuery, loadUsers]);
 
   const handleUserPress = (user: UserSearchResult) => {
     navigation.navigate('UserProfileFeed', {
@@ -134,20 +105,19 @@ export const DashboardHome: React.FC = () => {
     });
   };
 
-  const handleCloseDetails = () => {
+  const handleOpenFindGym = () => {
+    setActiveView({ type: 'FIND_GYM' });
+  };
+
+  const handleCloseFindGym = () => {
     setActiveView({ type: 'WIDGETS_OR_LIST' });
   };
 
   const isSearching = searchQuery.trim().length > 0;
-  const searchLoading = gymLoading || userLoading;
 
-  if (activeView.type === 'DETAILS') {
-    return (
-      <GymDetailsScreen
-        gymId={activeView.gymId}
-        onClose={handleCloseDetails}
-      />
-    );
+  // Show FindGym screen
+  if (activeView.type === 'FIND_GYM') {
+    return <FindGym onClose={handleCloseFindGym} />;
   }
 
   const renderUserItem = (user: UserSearchResult) => (
@@ -178,52 +148,35 @@ export const DashboardHome: React.FC = () => {
   );
 
   const renderSearchResults = () => {
-    if (searchLoading) {
+    if (userLoading) {
       return <ActivityIndicator size="large" color={palette.primary} style={localStyles.loadingText} />;
     }
 
-    if (!searchLoading && searchQuery.trim().length > 0 && gyms.length === 0 && users.length === 0) {
+    if (!userLoading && searchQuery.trim().length > 0 && users.length === 0) {
       return (
         <Text style={[localStyles.noResultsText, { color: palette.subText }]}>
-          No gyms or users match "{searchQuery}".
+          Nie znaleziono użytkowników dla "{searchQuery}".
         </Text>
       );
     }
 
-    const sections: SearchSection[] = [];
-    if (users.length > 0) sections.push({ title: 'Users', key: 'users', data: users });
-    if (gyms.length > 0) sections.push({ title: 'Gyms', key: 'gyms', data: gyms });
-
-    if (sections.length === 0) {
+    if (users.length === 0) {
       return (
         <Text style={[localStyles.noResultsText, { color: palette.subText }]}>
-          Start typing to search gyms or users.
+          Wpisz frazę aby wyszukać użytkowników.
         </Text>
       );
     }
 
     return (
       <SectionList
-        sections={sections}
-        keyExtractor={(item, index, section) =>
-          section?.title === 'Users'
-            ? `user-${(item as UserSearchResult).id}-${index}`
-            : `gym-${(item as Gym).id}-${index}`
-        }
+        sections={[{ title: 'Users', data: users }]}
+        keyExtractor={(item, index) => `user-${item.id}-${index}`}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item, section }) =>
-          section.title === 'Users'
-            ? renderUserItem(item as UserSearchResult)
-            : (
-              <GymListItem
-                gym={item as Gym}
-                onPress={handleGymPress}
-              />
-            )
-        }
+        renderItem={({ item }) => renderUserItem(item)}
         renderSectionHeader={({ section }) => (
           <Text style={[localStyles.sectionHeader, { color: palette.subText }]}>
-            {section.title}
+            Użytkownicy ({users.length})
           </Text>
         )}
         stickySectionHeadersEnabled={false}
@@ -235,6 +188,37 @@ export const DashboardHome: React.FC = () => {
 
   const renderDashboardWidgets = () => (
     <>
+      {/* Find Gym Card */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={handleOpenFindGym}
+        style={{ marginBottom: 16 }}
+      >
+        <LinearGradient
+          colors={['#3b82f6', '#1d4ed8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.rivalryCard}
+        >
+          <View style={styles.rivalryTop}>
+            <View style={styles.rivalryCopy}>
+              <Text style={styles.rivalryTitle}>Znajdź Siłownię</Text>
+              <Text style={styles.rivalrySubtitle}>
+                Wyszukaj siłownie w pobliżu i filtruj od najbliższych.
+              </Text>
+            </View>
+            <View style={styles.rivalryBadge}>
+              <Ionicons name="fitness" size={26} color="#fff" />
+            </View>
+          </View>
+          <View style={styles.rivalryCta}>
+            <Text style={styles.rivalryCtaText}>Szukaj siłowni</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Rivalry Card */}
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Rivalry')}
@@ -263,6 +247,7 @@ export const DashboardHome: React.FC = () => {
           </View>
         </LinearGradient>
       </TouchableOpacity>
+
       <View style={styles.statsRow}>
         <StepsCard styles={styles} palette={palette} />
         <WeightCard styles={styles} palette={palette} />
