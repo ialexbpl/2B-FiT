@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, Modal, TextInput, Pressable, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Modal, TextInput, Pressable, TouchableWithoutFeedback, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Pedometer } from 'expo-sensors';
 import type { Palette } from '@styles/theme';
 import type { Styles } from './DashboardStyles';
 import { useSteps } from '@hooks/useSteps';
@@ -16,12 +17,13 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
     const [goalSteps, setGoalSteps] = useState(10000);
     const [goalInput, setGoalInput] = useState('10000');
     const [goalModalVisible, setGoalModalVisible] = useState(false);
+    const [infoModalVisible, setInfoModalVisible] = useState(false);
     const STORAGE_KEY = 'steps:goal';
     const HIGHSCORE_KEY = 'steps:highscore';
     const [highscore, setHighscore] = useState<{ steps: number; date: string } | null>(null);
     const CALORIES_PER_STEP = 0.04; // rough average kcal per step
 
-    const { steps, isAvailable, loading, error, refresh } = useSteps(goalSteps);
+    const { steps, isAvailable, loading, error, refresh, source: stepsSource } = useSteps(goalSteps);
     const todayKey = useMemo(() => new Date().toISOString().split('T')[0], [steps, goalSteps]);
     const burnedKcal = useMemo(() => Math.max(0, Math.round(steps * CALORIES_PER_STEP)), [steps]);
 
@@ -56,6 +58,7 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
         const ratio = goalSteps > 0 ? steps / goalSteps : 0;
         return Math.max(0, Math.min(ratio, 1));
     }, [goalSteps, steps]);
+    const showStepsHelp = Platform.OS === 'android' && stepsSource !== 'pedometer' && (!isAvailable || !!error);
 
     useEffect(() => {
         if (steps <= 0) return;
@@ -124,6 +127,57 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
         return () => clearInterval(id);
     }, [evaluateStreak]);
 
+    const requestStepPermission = useCallback(async () => {
+        if (Platform.OS !== 'android') {
+            return { granted: true, requested: false };
+        }
+        try {
+            const getPerm = (Pedometer as any).getPermissionsAsync;
+            const requestPerm = (Pedometer as any).requestPermissionsAsync;
+            if (!getPerm || !requestPerm) {
+                return { granted: true, requested: false };
+            }
+            const { status } = await getPerm();
+            if (status === 'granted') {
+                return { granted: true, requested: false };
+            }
+            const { status: reqStatus } = await requestPerm();
+            return { granted: reqStatus === 'granted', requested: true };
+        } catch {
+            return { granted: false, requested: false };
+        }
+    }, []);
+
+    const handleCardPress = useCallback(async () => {
+        const perm = await requestStepPermission();
+        if (Platform.OS === 'android' && perm.requested) {
+            if (perm.granted) {
+                try {
+                    await refresh();
+                } catch {
+                    // ignore refresh errors after permission
+                }
+                return;
+            }
+            if (showStepsHelp) {
+                setInfoModalVisible(true);
+            }
+            return;
+        }
+
+        if (showStepsHelp) {
+            setInfoModalVisible(true);
+        } else {
+            setGoalModalVisible(true);
+        }
+    }, [refresh, requestStepPermission, showStepsHelp]);
+
+    useEffect(() => {
+        if (!showStepsHelp && infoModalVisible) {
+            setInfoModalVisible(false);
+        }
+    }, [infoModalVisible, showStepsHelp]);
+
     const handleSaveGoal = async () => {
         const parsed = Math.max(1, Math.round(Number(goalInput.replace(/\D+/g, '')) || 0));
         setGoalSteps(parsed);
@@ -136,7 +190,7 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
         <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.card, styles.smallCard]}
-            onPress={() => setGoalModalVisible(true)}
+            onPress={handleCardPress}
         >
             <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Steps</Text>
@@ -149,6 +203,11 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
                 ) : !isAvailable ? (
                     <View style={styles.stepsTextContainer}>
                         <Text style={styles.stepsCurrent}>Unavailable</Text>
+                        {showStepsHelp ? (
+                            <Text style={[styles.stepsGoal, { marginTop: 4 }]}>
+                                Tap to connect Google Health
+                            </Text>
+                        ) : null}
                         <TouchableOpacity onPress={refresh} style={{ marginTop: 6 }}>
                             <Text style={[styles.stepsGoal, { color: palette.primary }]}>Retry</Text>
                         </TouchableOpacity>
@@ -156,6 +215,11 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
                 ) : error ? (
                     <View style={styles.stepsTextContainer}>
                         <Text style={styles.stepsCurrent}>No data</Text>
+                        {showStepsHelp ? (
+                            <Text style={[styles.stepsGoal, { marginTop: 4 }]}>
+                                Tap to connect Google Health
+                            </Text>
+                        ) : null}
                         <TouchableOpacity onPress={refresh} style={{ marginTop: 6 }}>
                             <Text style={[styles.stepsGoal, { color: palette.primary }]}>Try again</Text>
                         </TouchableOpacity>
@@ -231,6 +295,51 @@ export const StepsCard: React.FC<Props> = ({ styles, palette }) => {
                     </TouchableWithoutFeedback>
                 </Pressable>
             </Modal>
+
+            {Platform.OS === 'android' ? (
+                <Modal
+                    visible={infoModalVisible}
+                    animationType="fade"
+                    transparent
+                    onRequestClose={() => setInfoModalVisible(false)}
+                >
+                    <Pressable
+                        style={{
+                            flex: 1,
+                            backgroundColor: 'rgba(0,0,0,0.35)',
+                            justifyContent: 'center',
+                            padding: 20,
+                        }}
+                        onPress={() => setInfoModalVisible(false)}
+                    >
+                        <TouchableWithoutFeedback>
+                            <View
+                                style={{
+                                    backgroundColor: palette.card100,
+                                    borderRadius: 16,
+                                    padding: 20,
+                                    borderColor: palette.border,
+                                    borderWidth: 1,
+                                }}
+                            >
+                                <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>
+                                    Connect Google Health
+                                </Text>
+                                <Text style={{ color: palette.subText, marginTop: 6, fontSize: 13 }}>
+                                    - Install or update Health Connect from Google Play.
+                                    {'\n'}- Open Health Connect > Apps > 2B FiT and allow Steps.
+                                    {'\n'}- Return here and tap Retry.
+                                </Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+                                    <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
+                                        <Text style={{ color: palette.primary, fontWeight: '700' }}>Close</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </Pressable>
+                </Modal>
+            ) : null}
         </TouchableOpacity>
     );
 };
