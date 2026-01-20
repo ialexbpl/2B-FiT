@@ -20,10 +20,17 @@ export const makeProfileStyles = (palette: Palette) =>
       paddingVertical: 12,
       position: 'relative',
     },
-    topRightIcons: {
+    topLeftIcons: {
       position: 'absolute',
       top: 8,
       left: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    topRightIcons: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
       flexDirection: 'row',
       alignItems: 'center',
     },

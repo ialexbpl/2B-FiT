@@ -52,7 +52,7 @@ export const DuelScreen = ({ route }: any) => {
         getUser();
     }, []);
 
-    const fetchChallenge = async (id: string) => {
+    const fetchChallenge = React.useCallback(async (id: string) => {
         try {
             const { getChallengeById } = require('../../api/rivalryService');
             const data = await getChallengeById(id);
@@ -62,7 +62,7 @@ export const DuelScreen = ({ route }: any) => {
             console.warn(e);
         }
         return null;
-    };
+    }, []);
 
     const startQuickMatch = async () => {
         setShowConfig(false);
@@ -102,7 +102,39 @@ export const DuelScreen = ({ route }: any) => {
         };
 
         init();
-    }, [challengeId]);
+    }, [challengeId, fetchChallenge]);
+
+    React.useEffect(() => {
+        if (!challenge?.id) return;
+
+        const { supabase } = require('../../utils/supabase');
+        const channel = supabase
+            .channel(`duel-${challenge.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'rivalry_challenges',
+                    filter: `id=eq.${challenge.id}`
+                },
+                async (payload: any) => {
+                    const newRow = payload.new as any;
+                    const oldRow = payload.old as any;
+
+                    setChallenge((prev: any) => (prev ? { ...prev, ...newRow } : newRow));
+
+                    if (oldRow?.opponent_id !== newRow?.opponent_id || oldRow?.challenger_id !== newRow?.challenger_id) {
+                        await fetchChallenge(challenge.id);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [challenge?.id, fetchChallenge]);
 
     // Step tracking
     React.useEffect(() => {

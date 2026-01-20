@@ -91,6 +91,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     };
 }, []);
 
+    const syncProfileEmail = useCallback(async (userId: string, email?: string | null) => {
+        if (!userId || !email) return;
+        const { error } = await supabase
+            .from('profiles')
+            .update({ email })
+            .eq('id', userId);
+        if (error && (error as any).code !== '42703') {
+            console.warn('profile email update failed', error);
+        }
+    }, []);
+
     // Ensure a profile row exists for the current auth user (useful for OAuth like Google)
     const ensureProfile = useCallback(
         async (u: Session['user']) => {
@@ -140,6 +151,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         }
         // Make sure a profile row exists (handles Google/OAuth users without a profile)
         await ensureProfile(session.user);
+        await syncProfileEmail(session.user.id, session.user.email ?? null);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -154,7 +166,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         } catch (e) {
             console.warn('sqlite upsert failed', e);
         }
-    }, [session?.user?.id, ensureProfile]);
+    }, [session?.user?.id, ensureProfile, syncProfileEmail]);
 
     useEffect(() => {
         let cancelled = false;
@@ -183,7 +195,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         if (trimmed.includes('@')) {
             return signInWithEmail(trimmed, password);
         }
-        throw new Error('Sign in with email is required (profiles table has no email column).');
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('email')
+            .ilike('username', trimmed)
+            .maybeSingle();
+        if (error) {
+            if ((error as any).code === '42703') {
+                throw new Error('Username login requires profiles.email (missing column).');
+            }
+            console.error('username lookup failed', error);
+            throw new Error('Invalid login credentials.');
+        }
+        const email = (data as any)?.email as string | null | undefined;
+        if (!email) {
+            throw new Error('Invalid login credentials.');
+        }
+        return signInWithEmail(email, password);
     };
 
     const signUpWithEmail = async (email: string, password: string, username?: string) => {
@@ -196,6 +224,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         const newSession = data?.session ?? (await supabase.auth.getSession()).data.session;
         if (username && newSession?.user?.id) {
             await supabase.from('profiles').update({ username }).eq('id', newSession.user.id);
+        }
+        if (newSession?.user?.id && newSession.user.email) {
+            await syncProfileEmail(newSession.user.id, newSession.user.email);
         }
     };
 
