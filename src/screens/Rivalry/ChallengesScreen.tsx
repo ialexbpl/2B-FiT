@@ -16,31 +16,102 @@ export const ChallengesScreen = () => {
     const { getActiveChallenges, getChallengeHistory, getOpenLobbies, joinChallenge } = require('../../api/rivalryService');
     const { supabase } = require('../../utils/supabase');
 
+    const isUserInChallenge = (row: any, userId: string) =>
+        row?.challenger_id === userId || row?.opponent_id === userId;
+
+    const isOpenLobby = (row: any) => row?.status === 'pending' && !row?.opponent_id;
+
+    const isHistoryStatus = (status?: string) => status === 'finished' || status === 'declined';
+
+    const shouldRefresh = (payload: any, userId: string, tab: typeof activeTab) => {
+        const eventType = payload.eventType;
+        const newRow = payload.new as any;
+        const oldRow = payload.old as any;
+
+        if (eventType === 'INSERT') {
+            if (tab === 'join') return isOpenLobby(newRow);
+            if (tab === 'active') return newRow?.status === 'active' && isUserInChallenge(newRow, userId);
+            if (tab === 'history') return isHistoryStatus(newRow?.status) && isUserInChallenge(newRow, userId);
+        }
+
+        if (eventType === 'UPDATE') {
+            const statusChanged = oldRow?.status !== newRow?.status;
+            const opponentChanged = oldRow?.opponent_id !== newRow?.opponent_id;
+            if (!statusChanged && !opponentChanged) return false;
+
+            if (tab === 'join') return isOpenLobby(oldRow) || isOpenLobby(newRow);
+            if (tab === 'active') return isUserInChallenge(oldRow, userId) || isUserInChallenge(newRow, userId);
+            if (tab === 'history') {
+                if (!isUserInChallenge(oldRow, userId) && !isUserInChallenge(newRow, userId)) return false;
+                return isHistoryStatus(oldRow?.status) || isHistoryStatus(newRow?.status);
+            }
+        }
+
+        if (eventType === 'DELETE') {
+            if (tab === 'join') return isOpenLobby(oldRow);
+            if (tab === 'active') return isUserInChallenge(oldRow, userId);
+            if (tab === 'history') return isHistoryStatus(oldRow?.status) && isUserInChallenge(oldRow, userId);
+        }
+
+        return false;
+    };
+
+    const loadChallenges = React.useCallback(async (userId: string) => {
+        try {
+            let data = [];
+            if (activeTab === 'active') {
+                data = await getActiveChallenges(userId);
+            } else if (activeTab === 'join') {
+                data = await getOpenLobbies(userId);
+            } else {
+                data = await getChallengeHistory(userId);
+            }
+            setChallenges(data);
+        } catch (e) {
+            console.warn(e);
+        }
+    }, [activeTab]);
+
     useFocusEffect(
         React.useCallback(() => {
-            const loadData = async () => {
+            let active = true;
+            let channel: any;
+
+            const init = async () => {
                 setLoading(true);
                 try {
                     const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) return;
+                    if (!user || !active) return;
 
-                    let data = [];
-                    if (activeTab === 'active') {
-                        data = await getActiveChallenges(user.id);
-                    } else if (activeTab === 'join') {
-                        data = await getOpenLobbies(user.id);
-                    } else {
-                        data = await getChallengeHistory(user.id);
-                    }
-                    setChallenges(data);
+                    await loadChallenges(user.id);
+
+                    if (!active) return;
+
+                    channel = supabase
+                        .channel(`rivalry-challenges-${activeTab}-${user.id}`)
+                        .on(
+                            'postgres_changes',
+                            { event: '*', schema: 'public', table: 'rivalry_challenges' },
+                            (payload: any) => {
+                                if (!shouldRefresh(payload, user.id, activeTab)) return;
+                                loadChallenges(user.id);
+                            }
+                        )
+                        .subscribe();
                 } catch (e) {
                     console.warn(e);
                 } finally {
-                    setLoading(false);
+                    if (active) setLoading(false);
                 }
             };
-            loadData();
-        }, [activeTab])
+
+            init();
+
+            return () => {
+                active = false;
+                if (channel) supabase.removeChannel(channel);
+            };
+        }, [activeTab, loadChallenges])
     );
 
     const handleJoinChallenge = async (challengeId: string) => {
