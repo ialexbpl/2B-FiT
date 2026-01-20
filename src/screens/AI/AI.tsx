@@ -1,8 +1,9 @@
 // src/screens/AI/AI.tsx
 import React, { useMemo, useRef, useState } from 'react';
-import { /* Text, */ ScrollView, KeyboardAvoidingView, Platform, NativeModules } from 'react-native';
+import { ScrollView, KeyboardAvoidingView, Platform, NativeModules, View, Text, Pressable } from 'react-native';
 import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { makeAIStyles } from './AIStyles';
 import { AIConversation } from './AIConversation';
@@ -14,13 +15,48 @@ export type ChatMessage = {
   time: string;
 };
 
+// Check if we're in a standalone build (APK) vs development
+const isStandaloneBuild = !__DEV__;
+
 export const AI: React.FC = () => {
   const { palette, theme } = useTheme();
   const styles = useMemo(() => makeAIStyles(palette, theme), [palette, theme]);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [serverStatus, setServerStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   const scrollRef = useRef<ScrollView | null>(null);
+
+  // Get AI server URL from environment or use fallback
+  const getAIEndpoints = (): string[] => {
+    const envBase = process.env.EXPO_PUBLIC_AI_BASE_URL?.replace(/\/+$/, '');
+    
+    // In standalone builds, only use the environment variable
+    if (isStandaloneBuild) {
+      if (envBase) {
+        return [`${envBase}/chat`];
+      }
+      return []; // No server available in standalone without env var
+    }
+
+    // In development, try multiple endpoints
+    const scriptURL: string | undefined = (NativeModules as any)?.SourceCode?.scriptURL;
+    const bundlerHost = scriptURL ? scriptURL.split('://')[1]?.split(':')[0] : undefined;
+    const hostUri =
+      Constants.expoConfig?.hostUri ??
+      (Constants as any)?.manifest?.hostUri ??
+      (Constants as any)?.manifest?.debuggerHost;
+    const hostFromConfig = hostUri?.split(':')[0];
+    const host = bundlerHost || hostFromConfig;
+    const lanBase = host ? `http://${host}:8000` : undefined;
+
+    return [
+      envBase ? `${envBase}/chat` : undefined,
+      lanBase ? `${lanBase}/chat` : undefined,
+      'http://10.0.2.2:8000/chat', // Android emulator
+      'http://localhost:8000/chat' // iOS simulator
+    ].filter(Boolean) as string[];
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -48,24 +84,22 @@ export const AI: React.FC = () => {
       content: msg.text,
     }));
 
-    // Build endpoints dynamically: env override, then LAN from Metro host, then platform fallbacks
-    const scriptURL: string | undefined = (NativeModules as any)?.SourceCode?.scriptURL;
-    const bundlerHost = scriptURL ? scriptURL.split('://')[1]?.split(':')[0] : undefined;
-    const hostUri =
-      Constants.expoConfig?.hostUri ??
-      (Constants as any)?.manifest?.hostUri ??
-      (Constants as any)?.manifest?.debuggerHost;
-    const hostFromConfig = hostUri?.split(':')[0];
-    const host = bundlerHost || hostFromConfig;
-    const envBase = process.env.EXPO_PUBLIC_AI_BASE_URL?.replace(/\/+$/, ''); // e.g. http://192.168.x.x:8000
-    const lanBase = host ? `http://${host}:8000` : undefined;
+    const endpoints = getAIEndpoints();
+    
+    if (endpoints.length === 0) {
+      setServerStatus('disconnected');
+      setMessages(prev => prev.map(msg =>
+        msg.id === loadingId
+          ? {
+            ...msg,
+            text: 'AI Coach is not available in this build. Please set EXPO_PUBLIC_AI_BASE_URL to connect to an AI server.',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+          : msg
+      ));
+      return;
+    }
 
-    const endpoints = [
-      envBase ? `${envBase}/chat` : undefined, // set EXPO_PUBLIC_AI_BASE_URL in .env for stable URL (LAN/tunnel)
-      lanBase ? `${lanBase}/chat` : undefined, // derived from Metro host (LAN)
-      'http://10.0.2.2:8000/chat', // Android emulator
-      'http://localhost:8000/chat' // iOS simulator
-    ].filter(Boolean) as string[];
     console.log('[AI] endpoints to try:', endpoints);
 
     try {
@@ -79,7 +113,10 @@ export const AI: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: userText, history: historyPayload }),
           });
-          if (response.ok) break;
+          if (response.ok) {
+            setServerStatus('connected');
+            break;
+          }
         } catch (e) {
           error = e;
           continue;
@@ -104,11 +141,14 @@ export const AI: React.FC = () => {
 
     } catch (error) {
       console.error('AI Error:', error);
+      setServerStatus('disconnected');
       setMessages(prev => prev.map(msg =>
         msg.id === loadingId
           ? {
             ...msg,
-            text: 'Nie udalo sie polaczyc z serwerem AI. Sprawdz czy okno "Python AI Server" jest otwarte na komputerze.',
+            text: isStandaloneBuild 
+              ? 'Could not connect to AI server. Make sure EXPO_PUBLIC_AI_BASE_URL is set correctly and the server is running.'
+              : 'Could not connect to AI server. Make sure the Python AI server is running (run start_ai.bat on your computer).',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
           : msg
@@ -120,8 +160,28 @@ export const AI: React.FC = () => {
     console.log('Open camera/gallery');
   };
 
+  // Show info banner for standalone builds without AI server
+  const showServerInfo = isStandaloneBuild && !process.env.EXPO_PUBLIC_AI_BASE_URL;
+
   return (
     <SafeAreaView style={styles.container}>
+      {showServerInfo && (
+        <View style={{
+          backgroundColor: theme.colors.warning + '20',
+          padding: 12,
+          marginHorizontal: 16,
+          marginTop: 8,
+          borderRadius: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10
+        }}>
+          <Ionicons name="information-circle" size={24} color={theme.colors.warning} />
+          <Text style={{ color: palette.text, flex: 1, fontSize: 13 }}>
+            AI Coach requires a server connection. Contact the developer for setup instructions.
+          </Text>
+        </View>
+      )}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.select({ ios: 'padding', android: undefined })}
