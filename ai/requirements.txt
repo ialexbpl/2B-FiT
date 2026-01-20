@@ -1,9 +1,0 @@
-python-dotenv
-openai
-datasets
-sentence-transformers
-scikit-learn
-numpy
-fastapi
-uvicorn
-pydantic
